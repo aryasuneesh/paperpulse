@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'core/theme/app_theme.dart';
 import 'presentation/routing/app_router.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://dcalxffrersyylthiuon.supabase.co',
+    anonKey: 'sb_publishable_6HQX_VIUhAYZzNPhNvTOBg_e-3Q324X',
+  );
+
   runApp(const ProviderScope(child: PaperPulseApp()));
 }
 

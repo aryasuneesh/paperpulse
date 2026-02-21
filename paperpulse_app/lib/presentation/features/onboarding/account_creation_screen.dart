@@ -1,10 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart' as google_sign_in;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-class AccountCreationScreen extends StatelessWidget {
+class AccountCreationScreen extends StatefulWidget {
   const AccountCreationScreen({super.key});
+
+  @override
+  State<AccountCreationScreen> createState() => _AccountCreationScreenState();
+}
+
+class _AccountCreationScreenState extends State<AccountCreationScreen> {
+  bool _isLoading = false;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final webClientId =
+          '100706126205-5ovpkkd6j58i3519gfktfooqdvset2gj.apps.googleusercontent.com';
+
+      // 1. Force the GoogleSignIn plugin to request a fresh token
+      final googleSignIn = google_sign_in.GoogleSignIn.instance;
+      await googleSignIn.initialize(serverClientId: webClientId);
+
+      await googleSignIn.signOut();
+      final googleUser = await googleSignIn.authenticate();
+
+      final googleAuth = googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw 'No ID Token found.';
+      }
+
+      // 2. Pass the ID token to Supabase Auth
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+
+      // On success, go to digest
+      if (mounted) {
+        context.go('/digest');
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to sign in: $error'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,30 +166,33 @@ class AccountCreationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              OutlinedButton.icon(
-                onPressed: () {
-                  // Google auth placeholder
-                  context.go('/digest');
-                },
-                icon: const Icon(
-                  Icons.g_mobiledata,
-                  size: 24,
-                  color: AppColors.inkBlack,
-                ),
-                label: Text(
-                  'Continue with Google',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: AppColors.inkBlack,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: const BorderSide(color: AppColors.lightGray),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
+              _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.sageDark,
+                      ),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: _signInWithGoogle,
+                      icon: const Icon(
+                        Icons.g_mobiledata,
+                        size: 24,
+                        color: AppColors.inkBlack,
+                      ),
+                      label: Text(
+                        'Continue with Google',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppColors.inkBlack,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: AppColors.lightGray),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
             ],
           ),
         ),
