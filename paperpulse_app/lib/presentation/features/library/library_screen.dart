@@ -1,33 +1,29 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../data/models/paper.dart';
-import '../../common_widgets/compact_paper_card.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class LibraryScreen extends StatefulWidget {
+import '../../../core/theme/app_colors.dart';
+import '../../../data/models/bookmark.dart';
+import '../../../data/models/paper.dart';
+import '../../../data/repositories/paper_repository.dart';
+import '../../common_widgets/compact_paper_card.dart';
+import '../digest/paper_detail_modal.dart';
+import 'providers/bookmark_provider.dart';
+
+final dailyPapersProvider = FutureProvider<List<Paper>>((ref) {
+  return ref.watch(paperRepositoryProvider).fetchDailyPapers();
+});
+
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  State<LibraryScreen> createState() => _LibraryScreenState();
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends State<LibraryScreen>
+class _LibraryScreenState extends ConsumerState<LibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  final List<Paper> _mockSavedPapers = List.generate(
-    5,
-    (index) => Paper(
-      id: 'lib_$index',
-      title: 'Saved Paper Title $index',
-      authors: ['Author $index'],
-      source: PaperSource.semantic_scholar,
-      sourceUrl: '',
-      publishedAt: DateTime.now(),
-      topicTags: ['Neuroscience'],
-      curiosityHook: 'Focus on library.',
-    ),
-  );
 
   @override
   void initState() {
@@ -64,6 +60,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
                 child: TabBar(
                   controller: _tabController,
+                  indicatorSize: TabBarIndicatorSize.tab,
                   indicator: BoxDecoration(
                     color: AppColors.inkBlack,
                     borderRadius: BorderRadius.circular(8),
@@ -87,9 +84,9 @@ class _LibraryScreenState extends State<LibraryScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildPaperList(), // Unread
-                  _buildEmptyState('No papers in progress.'),
-                  _buildEmptyState('You haven\'t finished any papers yet.'),
+                  _buildPaperList(BookmarkStatus.unread),
+                  _buildPaperList(BookmarkStatus.in_progress),
+                  _buildPaperList(BookmarkStatus.finished),
                 ],
               ),
             ),
@@ -99,33 +96,82 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildPaperList() {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      itemCount: _mockSavedPapers.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return Dismissible(
-          key: ValueKey(_mockSavedPapers[index].id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: AppColors.cherryBlossom,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.delete_outline, color: AppColors.inkBlack),
-          ),
-          onDismissed: (_) {
-            setState(() {
-              _mockSavedPapers.removeAt(index);
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Removed from Library')),
+  Widget _buildPaperList(BookmarkStatus status) {
+    // Watch the actual state to trigger rebuilds dynamically when a bookmark is added/removed
+    final bookmarks = ref.watch(bookmarkProvider);
+    final bookmarkedIds = bookmarks
+        .where((b) => b.status == status)
+        .map((b) => b.paperId)
+        .toSet();
+
+    if (bookmarkedIds.isEmpty) {
+      return _buildEmptyState(
+        status == BookmarkStatus.unread
+            ? 'No unread papers. Swipe right in Digest to save!'
+            : status == BookmarkStatus.in_progress
+            ? 'No papers in progress.'
+            : 'You haven\'t finished any papers yet.',
+      );
+    }
+
+    // Usually we would query a database for just these IDs.
+    // For now, we'll fetch all daily papers and filter them.
+    final asyncPapers = ref.watch(dailyPapersProvider);
+
+    return asyncPapers.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.sageGreen),
+      ),
+      error: (err, stack) => _buildEmptyState('Failed to load papers.'),
+      data: (allPapers) {
+        final filteredPapers = allPapers
+            .where((p) => bookmarkedIds.contains(p.id))
+            .toList();
+
+        if (filteredPapers.isEmpty) {
+          return _buildEmptyState('Saved papers no longer available.');
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          itemCount: filteredPapers.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final paper = filteredPapers[index];
+            return Dismissible(
+              key: ValueKey(paper.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.cherryBlossom,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: AppColors.inkBlack,
+                ),
+              ),
+              onDismissed: (_) {
+                ref.read(bookmarkProvider.notifier).toggleBookmark(paper);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Removed from Library')),
+                );
+              },
+              child: CompactPaperCard(
+                paper: paper,
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => PaperDetailModal(paper: paper),
+                  );
+                },
+              ),
             );
           },
-          child: CompactPaperCard(paper: _mockSavedPapers[index], onTap: () {}),
         );
       },
     );
@@ -133,11 +179,15 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _buildEmptyState(String message) {
     return Center(
-      child: Text(
-        message,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
+        ),
       ),
     );
   }

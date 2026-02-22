@@ -1,0 +1,106 @@
+import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../main.dart'; // To access global sharedPrefs
+import '../../../../data/models/bookmark.dart';
+import '../../../../data/models/paper.dart';
+
+final bookmarkProvider = NotifierProvider<BookmarkNotifier, List<Bookmark>>(() {
+  return BookmarkNotifier();
+});
+
+class BookmarkNotifier extends Notifier<List<Bookmark>> {
+  static const _prefsKey = 'paperpulse_bookmarks';
+
+  @override
+  List<Bookmark> build() {
+    return _loadBookmarks();
+  }
+
+  List<Bookmark> _loadBookmarks() {
+    try {
+      final String? data = sharedPrefs.getString(_prefsKey);
+      if (data != null) {
+        final List<dynamic> jsonList = jsonDecode(data);
+        return jsonList.map((e) => Bookmark.fromJson(e)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  void _saveBookmarks(List<Bookmark> bookmarks) {
+    try {
+      final String data = jsonEncode(bookmarks.map((e) => e.toJson()).toList());
+      sharedPrefs.setString(_prefsKey, data);
+    } catch (_) {}
+  }
+
+  void toggleBookmark(Paper paper) {
+    if (state.any((b) => b.paperId == paper.id)) {
+      state = state.where((b) => b.paperId != paper.id).toList();
+    } else {
+      state = [
+        ...state,
+        Bookmark(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: 'user123', // Mock user ID for now
+          paperId: paper.id,
+          createdAt: DateTime.now(),
+          status: BookmarkStatus.unread,
+          topicTags: paper.topicTags,
+        ),
+      ];
+    }
+    _saveBookmarks(state);
+  }
+
+  void markAsInProgress(Paper paper) {
+    if (isBookmarked(paper.id)) {
+      updateStatus(paper.id, BookmarkStatus.in_progress);
+    } else {
+      state = [
+        ...state,
+        Bookmark(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: 'user123',
+          paperId: paper.id,
+          createdAt: DateTime.now(),
+          status: BookmarkStatus.in_progress,
+          topicTags: paper.topicTags,
+        ),
+      ];
+      _saveBookmarks(state);
+    }
+  }
+
+  void updateStatus(String paperId, BookmarkStatus newStatus) {
+    state = [
+      for (final bookmark in state)
+        if (bookmark.paperId == paperId)
+          Bookmark(
+            id: bookmark.id,
+            userId: bookmark.userId,
+            paperId: bookmark.paperId,
+            createdAt: bookmark.createdAt,
+            status: newStatus,
+            topicTags: bookmark.topicTags,
+          )
+        else
+          bookmark,
+    ];
+    _saveBookmarks(state);
+  }
+
+  bool isBookmarked(String paperId) {
+    return state.any((b) => b.paperId == paperId);
+  }
+
+  List<String> getBookmarkedPaperIds(BookmarkStatus? status) {
+    if (status == null) {
+      return state.map((b) => b.paperId).toList();
+    }
+    return state
+        .where((b) => b.status == status)
+        .map((b) => b.paperId)
+        .toList();
+  }
+}

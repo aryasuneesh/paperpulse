@@ -9,6 +9,7 @@ class CuriosityCard extends StatelessWidget {
     this.onBookmarkTap,
     this.onShareTap,
     this.onReadFullTap,
+    this.isScrollable = true,
     super.key,
   });
 
@@ -16,6 +17,7 @@ class CuriosityCard extends StatelessWidget {
   final VoidCallback? onBookmarkTap;
   final VoidCallback? onShareTap;
   final VoidCallback? onReadFullTap;
+  final bool isScrollable;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +39,7 @@ class CuriosityCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
           // Top Row: Topic Tag and Source Badge
           Row(
@@ -55,9 +57,9 @@ class CuriosityCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
-          // Author & Institution metadata
+          // Author metadata
           Text(
-            '${_formatAuthors()} • ${paper.institution ?? 'Independent'}',
+            _formatAuthors(),
             style: theme.textTheme.labelSmall?.copyWith(
               color: AppColors.lightGray,
             ),
@@ -66,12 +68,25 @@ class CuriosityCard extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           // Curiosity Hook Synopsis
-          Text(
-            paper.curiosityHook,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.paperWhite,
+          if (isScrollable)
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Text(
+                  paper.curiosityHook,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.paperWhite,
+                  ),
+                ),
+              ),
+            )
+          else
+            Text(
+              paper.curiosityHook,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.paperWhite,
+              ),
             ),
-          ),
           const SizedBox(height: 32),
           // CTA Button
           ElevatedButton(
@@ -96,14 +111,6 @@ class CuriosityCard extends StatelessWidget {
                 icon: Icons.bookmark_outline,
                 label: 'Save',
                 onTap: onBookmarkTap,
-                theme: theme,
-              ),
-              _buildActionIcon(
-                icon: Icons.edit_outlined,
-                label: 'Highlight',
-                onTap: () {
-                  // Pro feature hook
-                },
                 theme: theme,
               ),
               _buildActionIcon(

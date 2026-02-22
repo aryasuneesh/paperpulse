@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'app_router.dart';
 
 class ScaffoldWithNavBar extends StatelessWidget {
   const ScaffoldWithNavBar({required this.navigationShell, super.key});
@@ -42,11 +43,23 @@ class ScaffoldWithNavBar extends StatelessWidget {
   }
 
   void _onTap(BuildContext context, int index) {
+    if (index == navigationShell.currentIndex) {
+      GlobalKey<NavigatorState>? currentKey;
+      switch (index) {
+        case 0:
+          currentKey = shellNavigatorDigestKey;
+        case 1:
+          currentKey = shellNavigatorBrowseKey;
+        case 2:
+          currentKey = shellNavigatorLibraryKey;
+        case 3:
+          currentKey = shellNavigatorProfileKey;
+      }
+      currentKey?.currentState?.popUntil((route) => route.isFirst);
+    }
+
     navigationShell.goBranch(
       index,
-      // A common pattern when using bottom navigation bars is to support
-      // navigating to the initial location when tapping the item that is
-      // already active.
       initialLocation: index == navigationShell.currentIndex,
     );
   }

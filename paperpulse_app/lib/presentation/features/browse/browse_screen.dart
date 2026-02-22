@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
+import '../../../data/repositories/paper_repository.dart';
 import '../../common_widgets/compact_paper_card.dart';
+import '../digest/paper_detail_modal.dart';
 
-class BrowseScreen extends StatefulWidget {
+class BrowseScreen extends ConsumerStatefulWidget {
   const BrowseScreen({super.key});
 
   @override
-  State<BrowseScreen> createState() => _BrowseScreenState();
+  ConsumerState<BrowseScreen> createState() => _BrowseScreenState();
 }
 
-class _BrowseScreenState extends State<BrowseScreen> {
+class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   final List<String> _topics = [
     'All',
     'Machine Learning',
@@ -22,20 +25,43 @@ class _BrowseScreenState extends State<BrowseScreen> {
   ];
 
   String _selectedTopic = 'All';
+  List<Paper> _papers = [];
+  bool _isLoading = true;
+  String? _error;
 
-  final List<Paper> _mockPapers = List.generate(
-    10,
-    (index) => Paper(
-      id: 'browse_$index',
-      title: 'A New Approach to $index',
-      authors: ['Researcher $index'],
-      source: PaperSource.arxiv,
-      sourceUrl: '',
-      publishedAt: DateTime.now().subtract(Duration(days: index)),
-      topicTags: ['Machine Learning'],
-      curiosityHook: 'This is a mock hook for reading $index.',
-    ),
-  );
+  @override
+  void initState() {
+    super.initState();
+    _fetchPapers();
+  }
+
+  Future<void> _fetchPapers() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final repository = ref.read(paperRepositoryProvider);
+      final papers = await repository.fetchDailyPapers();
+
+      // Temporary filtering logic since the HF Daily API doesn't have a direct topic search endpoint yet
+      // In a real app we'd call a dedicated endpoint `repository.fetchPapersByTopic(topic)`
+      if (mounted) {
+        setState(() {
+          _papers = papers;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,28 +160,76 @@ class _BrowseScreenState extends State<BrowseScreen> {
             const SizedBox(height: 16),
 
             // Feed
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                itemCount: _mockPapers.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  return CompactPaperCard(
-                    paper: _mockPapers[index],
-                    onTap: () {
-                      // Open detail modal
-                    },
-                  );
-                },
-              ),
-            ),
+            Expanded(child: _buildFeedContent(theme)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFeedContent(ThemeData theme) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.sageGreen),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.midGray, size: 48),
+            const SizedBox(height: 16),
+            Text('Failed to load papers', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.midGray,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchPapers,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.sageDark,
+                foregroundColor: AppColors.paperWhite,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_papers.isEmpty) {
+      return Center(
+        child: Text(
+          'No papers found for this topic.',
+          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      itemCount: _papers.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        return CompactPaperCard(
+          paper: _papers[index],
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => PaperDetailModal(paper: _papers[index]),
+            );
+          },
+        );
+      },
     );
   }
 }

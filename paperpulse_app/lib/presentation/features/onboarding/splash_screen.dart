@@ -22,7 +22,7 @@ class _SplashScreenState extends State<SplashScreen> {
       });
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
-          context.go('/onboarding/interests');
+          context.go('/onboarding/welcome');
         }
       });
     });
@@ -36,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: AppColors.paperWhite,
       body: InkWell(
         onTap: () {
-          context.go('/onboarding/interests');
+          context.go('/onboarding/welcome');
         },
         child: Center(
           child: AnimatedOpacity(

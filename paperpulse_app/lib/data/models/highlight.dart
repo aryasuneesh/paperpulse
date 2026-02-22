@@ -4,6 +4,9 @@ class Highlight {
   final String paperId;
   final String textContent;
   final String color; // e.g., hex string
+  final int? pageNumber;
+  final String annotationName;
+  final List<String> tags;
   final DateTime createdAt;
 
   Highlight({
@@ -12,6 +15,61 @@ class Highlight {
     required this.paperId,
     required this.textContent,
     required this.color,
+    this.pageNumber,
+    required this.annotationName,
+    this.tags = const [],
     required this.createdAt,
   });
+
+  factory Highlight.fromJson(Map<String, dynamic> json) {
+    return Highlight(
+      id: json['id'] as String,
+      userId: json['userId'] as String,
+      paperId: json['paperId'] as String,
+      textContent: json['textContent'] as String,
+      color: json['color'] as String,
+      pageNumber: json['pageNumber'] as int?,
+      annotationName: json['annotationName'] as String? ?? '',
+      tags: List<String>.from(json['tags'] ?? []),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'paperId': paperId,
+      'textContent': textContent,
+      'color': color,
+      'pageNumber': pageNumber,
+      'annotationName': annotationName,
+      'tags': tags,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  Highlight copyWith({
+    String? id,
+    String? userId,
+    String? paperId,
+    String? textContent,
+    String? color,
+    int? pageNumber,
+    String? annotationName,
+    List<String>? tags,
+    DateTime? createdAt,
+  }) {
+    return Highlight(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      paperId: paperId ?? this.paperId,
+      textContent: textContent ?? this.textContent,
+      color: color ?? this.color,
+      pageNumber: pageNumber ?? this.pageNumber,
+      annotationName: annotationName ?? this.annotationName,
+      tags: tags ?? this.tags,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

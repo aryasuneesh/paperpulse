@@ -1,13 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/bookmark.dart';
+import '../library/providers/bookmark_provider.dart';
+import '../library/providers/highlight_provider.dart';
+import 'highlights_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final bookmarks = ref.watch(bookmarkProvider);
+    final highlights = ref.watch(highlightProvider);
+
+    final finishedPapersCount = bookmarks
+        .where((b) => b.status == BookmarkStatus.finished)
+        .length;
+
+    final exploredTopics = bookmarks.expand((b) => b.topicTags).toSet();
+    final topicsExploredCount = exploredTopics.length;
+
+    final highlightCount = highlights.length;
+
+    // Calculate reading focus for the radar
+    final topicCounts = <String, int>{};
+    for (final b in bookmarks) {
+      for (final tag in b.topicTags) {
+        topicCounts[tag] = (topicCounts[tag] ?? 0) + 1;
+      }
+    }
+
+    final sortedTopics = topicCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final topTopics = sortedTopics.take(3).toList();
+    final maxCount = topTopics.isNotEmpty ? topTopics.first.value : 1;
 
     return Scaffold(
       body: SafeArea(
@@ -90,9 +121,69 @@ class ProfileScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildStatCol('42', 'PAPERS READ', theme),
-                    _buildStatCol('8', 'TOPICS EXPLORED', theme),
-                    _buildStatCol('112', 'HIGHLIGHTS', theme),
+                    GestureDetector(
+                      onTap: () {
+                        context.go('/library');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.sageLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.sageGreen),
+                        ),
+                        child: _buildStatCol(
+                          '$finishedPapersCount',
+                          'PAPERS READ',
+                          theme,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.sageLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.sageGreen),
+                      ),
+                      child: _buildStatCol(
+                        '$topicsExploredCount',
+                        'TOPICS EXPLORED',
+                        theme,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const HighlightsScreen(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.sageLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.sageGreen),
+                        ),
+                        child: _buildStatCol(
+                          '$highlightCount',
+                          'HIGHLIGHTS',
+                          theme,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -115,11 +206,23 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildTopicBar('Machine Learning', 0.8),
-                    const SizedBox(height: 12),
-                    _buildTopicBar('Neuroscience', 0.6),
-                    const SizedBox(height: 12),
-                    _buildTopicBar('Biology', 0.3),
+                    if (topTopics.isEmpty)
+                      Text(
+                        'Read more papers to see your reading focus.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.midGray,
+                        ),
+                      )
+                    else
+                      ...topTopics.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildTopicBar(
+                            entry.key,
+                            entry.value / maxCount,
+                          ),
+                        );
+                      }),
                   ],
                 ),
               ),

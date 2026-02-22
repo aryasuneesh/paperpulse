@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
 import '../../common_widgets/curiosity_card.dart';
+import '../library/providers/bookmark_provider.dart';
+import 'paper_detail_modal.dart';
 import 'providers/digest_stack_provider.dart';
 
 class DigestScreen extends ConsumerWidget {
@@ -15,19 +17,29 @@ class DigestScreen extends ConsumerWidget {
     bool isRight,
     int maxPapers,
   ) {
-    if (ref.read(digestStackProvider).currentIndex < maxPapers) {
+    final currentIndex = ref.read(digestStackProvider).currentIndex;
+    if (currentIndex < maxPapers) {
       if (isRight) {
-        // Handle bookmark
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Saved to Library',
-              style: TextStyle(color: AppColors.inkBlack),
-            ),
-            backgroundColor: AppColors.sageGreen,
-            duration: Duration(seconds: 1),
-          ),
-        );
+        // Save to bookmark
+        final currentPaper = ref.read(digestStackProvider).papers[currentIndex];
+        final bookmarkNotifier = ref.read(bookmarkProvider.notifier);
+
+        Future.delayed(const Duration(milliseconds: 250), () {
+          bookmarkNotifier.toggleBookmark(currentPaper);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Saved to Library',
+                  style: TextStyle(color: AppColors.inkBlack),
+                ),
+                backgroundColor: AppColors.sageGreen,
+                duration: Duration(seconds: 1),
+              ),
+            );
+          }
+        });
       }
       ref.read(digestStackProvider.notifier).swipeCard();
     }
@@ -37,8 +49,8 @@ class DigestScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final digestState = ref.watch(digestStackProvider);
-    final _papers = digestState.papers;
-    final _currentIndex = digestState.currentIndex;
+    final papers = digestState.papers;
+    final currentIndex = digestState.currentIndex;
 
     return Scaffold(
       body: SafeArea(
@@ -50,18 +62,125 @@ class DigestScreen extends ConsumerWidget {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _buildDigestHeader(theme, _papers.length),
+              child: _buildDigestHeader(theme, papers.length),
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: _currentIndex >= _papers.length
-                  ? _buildEmptyState(theme, ref)
-                  : _buildCardStack(context, ref, _papers, _currentIndex),
+              child: _buildMainContent(
+                context,
+                theme,
+                ref,
+                digestState,
+                papers,
+                currentIndex,
+              ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMainContent(
+    BuildContext context,
+    ThemeData theme,
+    WidgetRef ref,
+    DigestStackState state,
+    List<Paper> papers,
+    int currentIndex,
+  ) {
+    if (state.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.sageGreen),
+      );
+    }
+
+    if (state.error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: AppColors.midGray,
+                size: 48,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load daily papers',
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                state.error!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.midGray,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (currentIndex >= papers.length) {
+      return _buildEmptyState(theme, ref);
+    }
+
+    return Stack(
+      children: [
+        _buildCardStack(context, ref, papers, currentIndex),
+        if (currentIndex == 0) // First-time tutorial overlay
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: IgnorePointer(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.inkBlack.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: const Text(
+                      '← Skip',
+                      style: TextStyle(
+                        color: AppColors.paperWhite,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.sageGreen.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: const Text(
+                      'Save →',
+                      style: TextStyle(
+                        color: AppColors.inkBlack,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -72,20 +191,21 @@ class DigestScreen extends ConsumerWidget {
         RichText(
           text: TextSpan(
             style: theme.textTheme.titleMedium?.copyWith(
-              fontFamily: 'Instrument Serif',
-              fontSize: 22,
+              fontFamily: 'DreamOrphans',
+              fontSize: 26,
             ),
-            children: const [
+            children: [
               TextSpan(
                 text: 'Paper',
-                style: TextStyle(color: AppColors.inkBlack),
-              ),
-              TextSpan(
-                text: 'Pulse',
                 style: TextStyle(
-                  color: AppColors.sageDark,
-                  fontStyle: FontStyle.italic,
+                  color: theme.brightness == Brightness.dark
+                      ? AppColors.paperWhite
+                      : AppColors.inkBlack,
                 ),
+              ),
+              const TextSpan(
+                text: 'Pulse',
+                style: TextStyle(color: AppColors.sageGreen),
               ),
             ],
           ),
@@ -145,12 +265,12 @@ class DigestScreen extends ConsumerWidget {
   Widget _buildCardStack(
     BuildContext context,
     WidgetRef ref,
-    List<Paper> _papers,
-    int _currentIndex,
+    List<Paper> papers,
+    int currentIndex,
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final remainingPapers = _papers.sublist(_currentIndex);
+        final remainingPapers = papers.sublist(currentIndex);
 
         return Stack(
           alignment: Alignment.topCenter,
@@ -181,12 +301,21 @@ class DigestScreen extends ConsumerWidget {
                           opacity: 1.0 - (index * 0.3),
                           child: CuriosityCard(
                             paper: paper,
+                            onReadFullTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) =>
+                                    PaperDetailModal(paper: paper),
+                              );
+                            },
                             onBookmarkTap: isTop
                                 ? () => _onSwipe(
                                     context,
                                     ref,
                                     true,
-                                    _papers.length,
+                                    papers.length,
                                   )
                                 : null,
                             onShareTap: isTop
@@ -209,7 +338,7 @@ class DigestScreen extends ConsumerWidget {
                         context,
                         ref,
                         direction == DismissDirection.startToEnd,
-                        _papers.length,
+                        papers.length,
                       );
                     },
                     child: cardWidget,
