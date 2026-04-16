@@ -3,14 +3,13 @@ import '../../../../data/models/paper.dart';
 import '../../../../data/repositories/paper_repository.dart';
 
 final digestStackProvider =
-    NotifierProvider<DigestStackNotifier, DigestStackState>(() {
-      return DigestStackNotifier();
-    });
+    NotifierProvider<DigestStackNotifier, DigestStackState>(
+      DigestStackNotifier.new,
+    );
 
 class DigestStackState {
   final List<Paper> papers;
   final int currentIndex;
-
   final bool isLoading;
   final String? error;
 
@@ -37,9 +36,11 @@ class DigestStackState {
 }
 
 class DigestStackNotifier extends Notifier<DigestStackState> {
+  bool _disposed = false;
+
   @override
   DigestStackState build() {
-    // Initial state is loading
+    ref.onDispose(() => _disposed = true);
     _loadPapers();
     return DigestStackState(papers: [], currentIndex: 0, isLoading: true);
   }
@@ -48,8 +49,10 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
     try {
       final repository = ref.read(paperRepositoryProvider);
       final papers = await repository.fetchDailyPapers();
+      if (_disposed) return;
       state = state.copyWith(papers: papers, isLoading: false, error: null);
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
