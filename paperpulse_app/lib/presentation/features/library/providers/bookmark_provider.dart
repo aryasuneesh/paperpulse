@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../main.dart'; // To access global sharedPrefs
+import '../../../../main.dart' show sharedPrefs;
+import '../../../../core/providers/user_provider.dart';
 import '../../../../data/models/bookmark.dart';
 import '../../../../data/models/paper.dart';
 
-final bookmarkProvider = NotifierProvider<BookmarkNotifier, List<Bookmark>>(() {
-  return BookmarkNotifier();
-});
+final bookmarkProvider = NotifierProvider<BookmarkNotifier, List<Bookmark>>(
+  BookmarkNotifier.new,
+);
 
 class BookmarkNotifier extends Notifier<List<Bookmark>> {
   static const _prefsKey = 'paperpulse_bookmarks';
@@ -23,7 +25,9 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
         final List<dynamic> jsonList = jsonDecode(data);
         return jsonList.map((e) => Bookmark.fromJson(e)).toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('Failed to load bookmarks: $e\n$st');
+    }
     return [];
   }
 
@@ -31,7 +35,9 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
     try {
       final String data = jsonEncode(bookmarks.map((e) => e.toJson()).toList());
       sharedPrefs.setString(_prefsKey, data);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('Failed to persist bookmarks: $e\n$st');
+    }
   }
 
   void toggleBookmark(Paper paper) {
@@ -42,7 +48,7 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
         ...state,
         Bookmark(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
-          userId: 'user123', // Mock user ID for now
+          userId: ref.read(currentUserIdProvider),
           paperId: paper.id,
           createdAt: DateTime.now(),
           status: BookmarkStatus.unread,
@@ -61,7 +67,7 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
         ...state,
         Bookmark(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
-          userId: 'user123',
+          userId: ref.read(currentUserIdProvider),
           paperId: paper.id,
           createdAt: DateTime.now(),
           status: BookmarkStatus.in_progress,
@@ -95,9 +101,7 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
   }
 
   List<String> getBookmarkedPaperIds(BookmarkStatus? status) {
-    if (status == null) {
-      return state.map((b) => b.paperId).toList();
-    }
+    if (status == null) return state.map((b) => b.paperId).toList();
     return state
         .where((b) => b.status == status)
         .map((b) => b.paperId)
