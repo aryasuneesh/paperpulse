@@ -4,17 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
-import '../../../../main.dart'; // To access global sharedPrefs
+import '../../../../main.dart' show sharedPrefs;
 import '../../../../data/models/highlight.dart';
 
 final highlightProvider = NotifierProvider<HighlightNotifier, List<Highlight>>(
-  () {
-    return HighlightNotifier();
-  },
+  HighlightNotifier.new,
 );
 
 class HighlightNotifier extends Notifier<List<Highlight>> {
   static const _prefsKey = 'paperpulse_highlights';
+
+  // Serializes concurrent PDF mutations per paper — prevents last-write-wins corruption
+  final Map<String, Future<void>> _pdfMutationQueue = {};
 
   @override
   List<Highlight> build() {
@@ -28,8 +29,8 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
         final List<dynamic> jsonList = jsonDecode(data);
         return jsonList.map((e) => Highlight.fromJson(e)).toList();
       }
-    } catch (e) {
-      debugPrint('Highlight Load Error: $e');
+    } catch (e, st) {
+      debugPrint('Highlight load error: $e\n$st');
     }
     return [];
   }
@@ -40,7 +41,9 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
         highlights.map((e) => e.toJson()).toList(),
       );
       sharedPrefs.setString(_prefsKey, data);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('Failed to persist highlights: $e\n$st');
+    }
   }
 
   void addHighlight(Highlight highlight) {
@@ -61,55 +64,66 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
     state = state.where((h) => !idsToRemove.contains(h.id)).toList();
     _saveHighlights(state);
 
-    // Group deletions by paperId to minimize file I/O operations
+    // Group by paperId to minimize file I/O
     final Map<String, List<Highlight>> paperDeletions = {};
     for (final h in highlightsToRemove) {
       paperDeletions.putIfAbsent(h.paperId, () => []).add(h);
     }
 
+    // Chain mutations per paper — prevents concurrent writes corrupting the same PDF
+    for (final entry in paperDeletions.entries) {
+      final paperId = entry.key;
+      final highlights = entry.value;
+      _pdfMutationQueue[paperId] =
+          (_pdfMutationQueue[paperId] ?? Future<void>.value())
+              .then((_) => _removeAnnotationsFromPdf(paperId, highlights));
+    }
+
+    // Await this call's mutations before returning
+    await Future.wait(
+      paperDeletions.keys.map((id) => _pdfMutationQueue[id]!),
+    );
+  }
+
+  Future<void> _removeAnnotationsFromPdf(
+    String paperId,
+    List<Highlight> highlights,
+  ) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      for (final entry in paperDeletions.entries) {
-        final paperId = entry.key;
-        final highlights = entry.value;
+      final file = File('${dir.path}/paper_$paperId.pdf');
+      if (!await file.exists()) return;
 
-        final file = File('${dir.path}/paper_$paperId.pdf');
-        if (await file.exists()) {
-          final List<int> bytes = await file.readAsBytes();
-          final PdfDocument document = PdfDocument(inputBytes: bytes);
-          bool modified = false;
+      final List<int> bytes = await file.readAsBytes();
+      final PdfDocument document = PdfDocument(inputBytes: bytes);
+      bool modified = false;
 
-          for (final highlight in highlights) {
-            if (highlight.pageNumber != null &&
-                highlight.pageNumber! > 0 &&
-                highlight.pageNumber! <= document.pages.count) {
-              final PdfPage page = document.pages[highlight.pageNumber! - 1];
-
-              // Backward traversal since we are removing items
-              for (int i = page.annotations.count - 1; i >= 0; i--) {
-                final PdfAnnotation pdfAnnotation = page.annotations[i];
-                if (pdfAnnotation is PdfTextMarkupAnnotation &&
-                    pdfAnnotation.text == highlight.annotationName) {
-                  page.annotations.remove(pdfAnnotation);
-                  modified = true;
-                  break;
-                }
-              }
+      for (final highlight in highlights) {
+        if (highlight.pageNumber != null &&
+            highlight.pageNumber! > 0 &&
+            highlight.pageNumber! <= document.pages.count) {
+          final PdfPage page = document.pages[highlight.pageNumber! - 1];
+          for (int i = page.annotations.count - 1; i >= 0; i--) {
+            final PdfAnnotation pdfAnnotation = page.annotations[i];
+            if (pdfAnnotation is PdfTextMarkupAnnotation &&
+                pdfAnnotation.text == highlight.annotationName) {
+              page.annotations.remove(pdfAnnotation);
+              modified = true;
+              break;
             }
           }
-
-          if (modified) {
-            final List<int> savedBytes = await compute<PdfDocument, List<int>>(
-              (PdfDocument doc) => doc.saveSync(),
-              document,
-            );
-            await file.writeAsBytes(savedBytes, flush: true);
-          }
-          document.dispose();
         }
       }
-    } catch (e) {
-      debugPrint('Error removing annotation from PDF: $e');
+
+      if (modified) {
+        // Fix: Future() instead of compute() — PdfDocument wraps a native object
+        // and cannot be serialized across Dart isolate boundaries
+        final List<int> savedBytes = await Future(() => document.saveSync());
+        await file.writeAsBytes(savedBytes, flush: true);
+      }
+      document.dispose();
+    } catch (e, st) {
+      debugPrint('Error removing annotation from PDF: $e\n$st');
     }
   }
 
