@@ -15,15 +15,27 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
 
   @override
   List<Bookmark> build() {
-    return _loadBookmarks();
+    final currentUserId = ref.watch(currentUserIdProvider);
+    return _loadBookmarks(currentUserId);
   }
 
-  List<Bookmark> _loadBookmarks() {
+  List<Bookmark> _loadBookmarks(String currentUserId) {
     try {
       final String? data = sharedPrefs.getString(_prefsKey);
       if (data != null) {
         final List<dynamic> jsonList = jsonDecode(data);
-        return jsonList.map((e) => Bookmark.fromJson(e)).toList();
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) {
+              try {
+                return Bookmark.fromJson(e);
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<Bookmark>()
+            .where((b) => b.userId == currentUserId)
+            .toList();
       }
     } catch (e, st) {
       debugPrint('Failed to load bookmarks: $e\n$st');
@@ -33,8 +45,18 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
 
   void _saveBookmarks(List<Bookmark> bookmarks) {
     try {
-      final String data = jsonEncode(bookmarks.map((e) => e.toJson()).toList());
-      sharedPrefs.setString(_prefsKey, data);
+      final currentUserId = ref.read(currentUserIdProvider);
+      List<Map<String, dynamic>> allBookmarks = [];
+      final String? existing = sharedPrefs.getString(_prefsKey);
+      if (existing != null) {
+        final decoded = jsonDecode(existing) as List;
+        allBookmarks = decoded
+            .whereType<Map<String, dynamic>>()
+            .where((e) => e['userId'] != currentUserId)
+            .toList();
+      }
+      allBookmarks.addAll(bookmarks.map((e) => e.toJson()));
+      sharedPrefs.setString(_prefsKey, jsonEncode(allBookmarks));
     } catch (e, st) {
       debugPrint('Failed to persist bookmarks: $e\n$st');
     }

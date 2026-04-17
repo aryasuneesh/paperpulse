@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../../../main.dart' show sharedPrefs;
+import '../../../../core/providers/user_provider.dart';
 import '../../../../data/models/highlight.dart';
 
 final highlightProvider = NotifierProvider<HighlightNotifier, List<Highlight>>(
@@ -14,20 +15,31 @@ final highlightProvider = NotifierProvider<HighlightNotifier, List<Highlight>>(
 class HighlightNotifier extends Notifier<List<Highlight>> {
   static const _prefsKey = 'paperpulse_highlights';
 
-  // Serializes concurrent PDF mutations per paper — prevents last-write-wins corruption
   final Map<String, Future<void>> _pdfMutationQueue = {};
 
   @override
   List<Highlight> build() {
-    return _loadHighlights();
+    final currentUserId = ref.watch(currentUserIdProvider);
+    return _loadHighlights(currentUserId);
   }
 
-  List<Highlight> _loadHighlights() {
+  List<Highlight> _loadHighlights(String currentUserId) {
     try {
       final String? data = sharedPrefs.getString(_prefsKey);
       if (data != null) {
         final List<dynamic> jsonList = jsonDecode(data);
-        return jsonList.map((e) => Highlight.fromJson(e)).toList();
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) {
+              try {
+                return Highlight.fromJson(e);
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<Highlight>()
+            .where((h) => h.userId == currentUserId)
+            .toList();
       }
     } catch (e, st) {
       debugPrint('Highlight load error: $e\n$st');
@@ -37,10 +49,19 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
 
   void _saveHighlights(List<Highlight> highlights) {
     try {
-      final String data = jsonEncode(
-        highlights.map((e) => e.toJson()).toList(),
-      );
-      sharedPrefs.setString(_prefsKey, data);
+      // Load ALL highlights (other users), replace only this user's entries
+      final currentUserId = ref.read(currentUserIdProvider);
+      List<Map<String, dynamic>> allHighlights = [];
+      final String? existing = sharedPrefs.getString(_prefsKey);
+      if (existing != null) {
+        final decoded = jsonDecode(existing) as List;
+        allHighlights = decoded
+            .whereType<Map<String, dynamic>>()
+            .where((e) => e['userId'] != currentUserId)
+            .toList();
+      }
+      allHighlights.addAll(highlights.map((e) => e.toJson()));
+      sharedPrefs.setString(_prefsKey, jsonEncode(allHighlights));
     } catch (e, st) {
       debugPrint('Failed to persist highlights: $e\n$st');
     }
@@ -64,13 +85,11 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
     state = state.where((h) => !idsToRemove.contains(h.id)).toList();
     _saveHighlights(state);
 
-    // Group by paperId to minimize file I/O
     final Map<String, List<Highlight>> paperDeletions = {};
     for (final h in highlightsToRemove) {
       paperDeletions.putIfAbsent(h.paperId, () => []).add(h);
     }
 
-    // Chain mutations per paper — prevents concurrent writes corrupting the same PDF
     for (final entry in paperDeletions.entries) {
       final paperId = entry.key;
       final highlights = entry.value;
@@ -79,7 +98,6 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
               .then((_) => _removeAnnotationsFromPdf(paperId, highlights));
     }
 
-    // Await this call's mutations before returning
     await Future.wait(
       paperDeletions.keys.map((id) => _pdfMutationQueue[id]!),
     );
@@ -90,6 +108,8 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
     List<Highlight> highlights,
   ) async {
     try {
+      // Reject paperIds that could escape the documents directory via path traversal.
+      if (!RegExp(r'^[a-zA-Z0-9.\-]+$').hasMatch(paperId)) return;
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/paper_$paperId.pdf');
       if (!await file.exists()) return;
@@ -116,8 +136,6 @@ class HighlightNotifier extends Notifier<List<Highlight>> {
       }
 
       if (modified) {
-        // Fix: Future() instead of compute() — PdfDocument wraps a native object
-        // and cannot be serialized across Dart isolate boundaries
         final List<int> savedBytes = await Future(() => document.saveSync());
         await file.writeAsBytes(savedBytes, flush: true);
       }

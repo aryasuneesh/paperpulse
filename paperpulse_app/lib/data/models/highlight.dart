@@ -1,3 +1,26 @@
+String _sanitizeUtf16(String input) {
+  final units = input.codeUnits;
+  final result = <int>[];
+  for (var i = 0; i < units.length; i++) {
+    final unit = units[i];
+    if (unit >= 0xD800 && unit <= 0xDBFF) {
+      // High surrogate — valid only if followed by a low surrogate.
+      if (i + 1 < units.length &&
+          units[i + 1] >= 0xDC00 &&
+          units[i + 1] <= 0xDFFF) {
+        result.add(unit);
+        result.add(units[++i]);
+      }
+      // else: lone high surrogate — drop it
+    } else if (unit >= 0xDC00 && unit <= 0xDFFF) {
+      // Lone low surrogate — drop it
+    } else {
+      result.add(unit);
+    }
+  }
+  return String.fromCharCodes(result);
+}
+
 class Highlight {
   final String id;
   final String userId;
@@ -26,7 +49,7 @@ class Highlight {
       id: json['id'] as String,
       userId: json['userId'] as String,
       paperId: json['paperId'] as String,
-      textContent: json['textContent'] as String,
+      textContent: _sanitizeUtf16(json['textContent'] as String),
       color: json['color'] as String,
       pageNumber: json['pageNumber'] as int?,
       annotationName: json['annotationName'] as String? ?? '',

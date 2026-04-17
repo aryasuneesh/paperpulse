@@ -37,3 +37,12 @@ final currentUserIdProvider = Provider<String>((ref) {
   sharedPrefs.setString(_deviceUuidKey, newId);
   return newId;
 });
+
+/// True when the user has no Supabase session (device UUID identity).
+final isGuestProvider = Provider<bool>((ref) {
+  try {
+    return Supabase.instance.client.auth.currentUser == null;
+  } catch (_) {
+    return true;
+  }
+});

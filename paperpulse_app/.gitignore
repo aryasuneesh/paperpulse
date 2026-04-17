@@ -48,3 +48,6 @@ GEMINI.md
 PRP.md
 
 .env.json
+
+.claude/
+.idea/
