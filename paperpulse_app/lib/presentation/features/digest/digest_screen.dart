@@ -7,6 +7,8 @@ import '../../common_widgets/curiosity_card.dart';
 import '../library/providers/bookmark_provider.dart';
 import 'paper_detail_modal.dart';
 import 'providers/digest_stack_provider.dart';
+import 'providers/streak_provider.dart';
+import 'share_card_sheet.dart';
 
 class DigestScreen extends ConsumerWidget {
   const DigestScreen({super.key});
@@ -42,6 +44,7 @@ class DigestScreen extends ConsumerWidget {
         });
       }
       ref.read(digestStackProvider.notifier).swipeCard();
+      ref.read(streakProvider.notifier).markActivity();
     }
   }
 
@@ -58,7 +61,7 @@ class DigestScreen extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: _buildTopBar(theme),
+              child: _buildTopBar(theme, ref),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -184,7 +187,10 @@ class DigestScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTopBar(ThemeData theme) {
+  Widget _buildTopBar(ThemeData theme, WidgetRef ref) {
+    final streak = ref.watch(streakProvider);
+    final streakLabel = streak > 0 ? '$streak-day streak' : 'Start a streak!';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -216,14 +222,14 @@ class DigestScreen extends ConsumerWidget {
             color: AppColors.sageLight,
             borderRadius: BorderRadius.circular(100),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Text('🔥', style: TextStyle(fontSize: 12)),
-              SizedBox(width: 4),
+              const Text('🔥', style: TextStyle(fontSize: 12)),
+              const SizedBox(width: 4),
               Text(
-                '12-day streak',
-                style: TextStyle(
-                  fontFamily: 'Geist Mono',
+                streakLabel,
+                style: const TextStyle(
+                  fontFamily: 'JetBrains Mono',
                   fontSize: 11,
                   color: AppColors.sageDark,
                   fontWeight: FontWeight.w600,
@@ -237,14 +243,27 @@ class DigestScreen extends ConsumerWidget {
   }
 
   Widget _buildDigestHeader(ThemeData theme, int totalPapers) {
+    final now = DateTime.now();
+    const days = [
+      'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
+      'FRIDAY', 'SATURDAY', 'SUNDAY',
+    ];
+    const months = [
+      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    ];
+    final dayName = days[now.weekday - 1];
+    final monthName = months[now.month - 1];
+    final headerDate = '$dayName DIGEST · $monthName ${now.day}';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 16),
         Text(
-          'MONDAY DIGEST · FEB 17',
+          headerDate,
           style: theme.textTheme.labelSmall?.copyWith(
-            fontFamily: 'Geist Mono',
+            fontFamily: 'JetBrains Mono',
             letterSpacing: 1.2,
           ),
         ),
@@ -319,9 +338,7 @@ class DigestScreen extends ConsumerWidget {
                                   )
                                 : null,
                             onShareTap: isTop
-                                ? () {
-                                    // TODO: Implement share
-                                  }
+                                ? () => ShareCardSheet.show(context, paper)
                                 : null,
                           ),
                         ),

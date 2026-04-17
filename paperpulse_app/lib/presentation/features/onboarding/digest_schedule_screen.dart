@@ -91,7 +91,7 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
                         Text(
                           'Your digest lands every ${_selectedDay.name.toUpperCase()} ${_selectedTime.name}.',
                           style: const TextStyle(
-                            fontFamily: 'Geist Mono',
+                            fontFamily: 'JetBrains Mono',
                             fontSize: 12,
                             color: AppColors.sageDark,
                             fontWeight: FontWeight.w600,

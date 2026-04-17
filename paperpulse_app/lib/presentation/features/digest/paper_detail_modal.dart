@@ -6,6 +6,7 @@ import '../../../data/models/paper.dart';
 import '../../common_widgets/curiosity_card.dart';
 import '../library/providers/bookmark_provider.dart';
 import 'pdf_reader_screen.dart';
+import 'share_card_sheet.dart';
 
 class PaperDetailModal extends ConsumerWidget {
   const PaperDetailModal({required this.paper, super.key});
@@ -69,7 +70,7 @@ class PaperDetailModal extends ConsumerWidget {
                     ),
                   );
                 },
-                onShareTap: () {},
+                onShareTap: () => ShareCardSheet.show(context, paper),
                 onReadFullTap: () {
                   ref.read(bookmarkProvider.notifier).markAsInProgress(paper);
                   Navigator.push(
@@ -169,7 +170,7 @@ class PaperDetailModal extends ConsumerWidget {
             style: TextStyle(
               color: isHighlight ? AppColors.sageDark : AppColors.inkBlack,
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
-              fontFamily: isHighlight ? 'Geist Mono' : 'Geist',
+              fontFamily: isHighlight ? 'JetBrains Mono' : 'Quicksand',
               fontSize: 14,
             ),
           ),

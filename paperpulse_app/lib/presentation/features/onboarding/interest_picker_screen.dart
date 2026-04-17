@@ -12,19 +12,20 @@ class InterestPickerScreen extends StatefulWidget {
 }
 
 class _InterestPickerScreenState extends State<InterestPickerScreen> {
+  // Topics reflect the actual HuggingFace Daily Papers catalogue (ML/AI domain)
   final List<String> _suggestedTopics = [
     'Machine Learning',
-    'Neuroscience',
-    'Climate Science',
-    'Physics',
-    'Economics',
-    'Biology',
     'Computer Vision',
-    'Linguistics',
-    'Materials Science',
-    'Psychology',
+    'Language Models',
+    'Generative AI',
     'Robotics',
-    'Astronomy',
+    'Reinforcement Learning',
+    'Multimodal AI',
+    'Audio & Speech',
+    'AI Safety',
+    'Neural Networks',
+    'Graph Learning',
+    'AI Research',
   ];
 
   final Set<String> _selectedTopics = {};
@@ -33,6 +34,7 @@ class _InterestPickerScreenState extends State<InterestPickerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isButtonEnabled = _selectedTopics.length >= 3;
+    final fromProfile = GoRouterState.of(context).uri.queryParameters['from'] == 'profile';
 
     return Scaffold(
       appBar: AppBar(
@@ -101,7 +103,13 @@ class _InterestPickerScreenState extends State<InterestPickerScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: ElevatedButton(
                   onPressed: isButtonEnabled
-                      ? () => context.push('/onboarding/schedule')
+                      ? () {
+                          if (fromProfile) {
+                            context.pop();
+                          } else {
+                            context.push('/onboarding/schedule');
+                          }
+                        }
                       : null,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),

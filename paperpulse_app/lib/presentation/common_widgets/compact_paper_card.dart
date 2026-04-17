@@ -63,7 +63,7 @@ class CompactPaperCard extends StatelessWidget {
     return Text(
       paper.topicTags.first.toUpperCase(),
       style: theme.textTheme.labelSmall?.copyWith(
-        fontFamily: 'Geist Mono',
+        fontFamily: 'JetBrains Mono',
         color: AppColors.sageDark,
         letterSpacing: 0.5,
         fontWeight: FontWeight.w600,

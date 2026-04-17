@@ -2,9 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
-import '../../../data/repositories/paper_repository.dart';
+import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
 import '../digest/paper_detail_modal.dart';
+
+// These match the actual topics inferred from HuggingFace Daily Papers (ML/AI domain)
+const _browseTopics = [
+  'All',
+  'Machine Learning',
+  'Computer Vision',
+  'Language Models',
+  'Generative AI',
+  'Robotics',
+  'Reinforcement Learning',
+  'Multimodal AI',
+  'Audio & Speech',
+  'AI Safety',
+];
 
 class BrowseScreen extends ConsumerStatefulWidget {
   const BrowseScreen({super.key});
@@ -14,58 +28,32 @@ class BrowseScreen extends ConsumerStatefulWidget {
 }
 
 class _BrowseScreenState extends ConsumerState<BrowseScreen> {
-  final List<String> _topics = [
-    'All',
-    'Machine Learning',
-    'Neuroscience',
-    'Climate Science',
-    'Physics',
-    'Economics',
-    'Biology',
-  ];
-
   String _selectedTopic = 'All';
-  List<Paper> _papers = [];
-  bool _isLoading = true;
-  String? _error;
+  String _searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchPapers();
-  }
-
-  Future<void> _fetchPapers() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final repository = ref.read(paperRepositoryProvider);
-      final papers = await repository.fetchDailyPapers();
-
-      // Temporary filtering logic since the HF Daily API doesn't have a direct topic search endpoint yet
-      // In a real app we'd call a dedicated endpoint `repository.fetchPapersByTopic(topic)`
-      if (mounted) {
-        setState(() {
-          _papers = papers;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+  List<Paper> _filter(List<Paper> papers) {
+    var list = papers;
+    if (_selectedTopic != 'All') {
+      list = list
+          .where((p) => p.topicTags.contains(_selectedTopic))
+          .toList();
     }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list
+          .where((p) =>
+              p.title.toLowerCase().contains(q) ||
+              p.authors.any((a) => a.toLowerCase().contains(q)) ||
+              p.topicTags.any((t) => t.toLowerCase().contains(q)))
+          .toList();
+    }
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final papersAsync = ref.watch(papersProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -81,17 +69,15 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
+                onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
                   hintText: 'Search topics, authors, keywords...',
-                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.midGray,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: AppColors.midGray,
-                  ),
+                  hintStyle: theme.textTheme.bodyMedium
+                      ?.copyWith(color: AppColors.midGray),
+                  prefixIcon:
+                      const Icon(Icons.search, color: AppColors.midGray),
                   filled: true,
-                  fillColor: AppColors.paperWhite,
+                  fillColor: theme.colorScheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(100),
                     borderSide: const BorderSide(color: AppColors.lightGray),
@@ -104,10 +90,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                     borderRadius: BorderRadius.circular(100),
                     borderSide: const BorderSide(color: AppColors.sageDark),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 0,
-                    horizontal: 20,
-                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
                 ),
               ),
             ),
@@ -120,21 +104,17 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _topics.length,
+                itemCount: _browseTopics.length,
                 itemBuilder: (context, index) {
-                  final topic = _topics[index];
+                  final topic = _browseTopics[index];
                   final isSelected = _selectedTopic == topic;
-
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: ChoiceChip(
                       label: Text(topic),
                       selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedTopic = topic;
-                        });
-                      },
+                      onSelected: (_) =>
+                          setState(() => _selectedTopic = topic),
                       labelStyle: theme.textTheme.labelMedium?.copyWith(
                         color: isSelected
                             ? AppColors.paperWhite
@@ -159,40 +139,27 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
             const SizedBox(height: 16),
 
-            // Feed
-            Expanded(child: _buildFeedContent(theme)),
+            Expanded(child: _buildFeed(theme, papersAsync)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeedContent(ThemeData theme) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.sageGreen),
-      );
-    }
-
-    if (_error != null) {
-      return Center(
+  Widget _buildFeed(ThemeData theme, AsyncValue<List<Paper>> papersAsync) {
+    return papersAsync.when(
+      loading: () =>
+          const Center(child: CircularProgressIndicator(color: AppColors.sageGreen)),
+      error: (err, _) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.error_outline, color: AppColors.midGray, size: 48),
             const SizedBox(height: 16),
             Text('Failed to load papers', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.midGray,
-              ),
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _fetchPapers,
+              onPressed: () => ref.read(papersProvider.notifier).refresh(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.sageDark,
                 foregroundColor: AppColors.paperWhite,
@@ -201,33 +168,36 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             ),
           ],
         ),
-      );
-    }
-
-    if (_papers.isEmpty) {
-      return Center(
-        child: Text(
-          'No papers found for this topic.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      itemCount: _papers.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return CompactPaperCard(
-          paper: _papers[index],
-          onTap: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) => PaperDetailModal(paper: _papers[index]),
-            );
-          },
+      ),
+      data: (all) {
+        final papers = _filter(all);
+        if (papers.isEmpty) {
+          return Center(
+            child: Text(
+              _selectedTopic == 'All'
+                  ? 'No papers available.'
+                  : 'No papers found for "$_selectedTopic".',
+              style:
+                  theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          itemCount: papers.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) => CompactPaperCard(
+            paper: papers[index],
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => PaperDetailModal(paper: papers[index]),
+              );
+            },
+          ),
         );
       },
     );

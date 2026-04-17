@@ -117,7 +117,7 @@ class SharePaperCardState extends State<SharePaperCard> {
                   child: Text(
                     '${_formatAuthors()}  •  ${widget.paper.publishedAt.year}',
                     style: TextStyle(
-                      fontFamily: 'Geist Mono',
+                      fontFamily: 'JetBrains Mono',
                       fontSize: 12,
                       color: widget.textColor.withOpacity(0.7),
                     ),
@@ -140,7 +140,7 @@ class SharePaperCardState extends State<SharePaperCard> {
                 child: Text(
                   'paperpulse.app',
                   style: TextStyle(
-                    fontFamily: 'Geist Mono',
+                    fontFamily: 'JetBrains Mono',
                     fontSize: 10,
                     color: widget.textColor.withOpacity(0.3),
                   ),
@@ -163,7 +163,7 @@ class SharePaperCardState extends State<SharePaperCard> {
       child: Text(
         widget.paper.source.name.toUpperCase(),
         style: TextStyle(
-          fontFamily: 'Geist',
+          fontFamily: 'Quicksand',
           fontSize: 10,
           fontWeight: FontWeight.w600,
           color: widget.textColor,
@@ -182,7 +182,7 @@ class SharePaperCardState extends State<SharePaperCard> {
       child: Text(
         widget.paper.topicTags.first.toUpperCase(),
         style: const TextStyle(
-          fontFamily: 'Geist Mono',
+          fontFamily: 'JetBrains Mono',
           fontSize: 14,
           fontWeight: FontWeight.bold,
           color: AppColors.sageDark,

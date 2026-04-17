@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../data/models/highlight.dart';
 import '../../../data/models/paper.dart';
+import '../../../data/models/bookmark.dart';
+import '../library/providers/bookmark_provider.dart';
 import '../library/providers/highlight_provider.dart';
 
 class PdfReaderScreen extends ConsumerStatefulWidget {
@@ -35,10 +38,21 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
   File? _localPdfFile;
   bool _isLoadingPdf = true;
 
+  int _currentPage = 1;
+  int _totalPages = 0;
+  bool _showPageIndicator = false;
+  Timer? _pageIndicatorTimer;
+
   @override
   void initState() {
     super.initState();
     _initLocalFile();
+  }
+
+  @override
+  void dispose() {
+    _pageIndicatorTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initLocalFile() async {
@@ -69,8 +83,8 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
     }
   }
 
-  // Extracted: shared onDocumentLoaded logic for both file and network viewers
-  Future<void> _onDocumentLoaded(PdfDocumentLoadedDetails _) async {
+  Future<void> _onDocumentLoaded(PdfDocumentLoadedDetails details) async {
+    setState(() => _totalPages = details.document.pages.count);
     if (widget.initialPageNumber != null) {
       _pdfViewerController.jumpToPage(widget.initialPageNumber!);
       await Future.delayed(const Duration(milliseconds: 300));
@@ -83,6 +97,71 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
           .trim();
       _pdfViewerController.searchText(sanitized);
     }
+  }
+
+  void _onPageChanged(PdfPageChangedDetails details) {
+    setState(() => _currentPage = details.newPageNumber);
+    _revealPageIndicator();
+    _checkIfFinished(details.newPageNumber);
+  }
+
+  void _checkIfFinished(int page) {
+    if (_totalPages > 0 && page >= _totalPages) {
+      ref
+          .read(bookmarkProvider.notifier)
+          .updateStatus(widget.paper.id, BookmarkStatus.finished);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Marked as Finished!'),
+            backgroundColor: AppColors.sageGreen,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _revealPageIndicator() {
+    setState(() => _showPageIndicator = true);
+    _pageIndicatorTimer?.cancel();
+    _pageIndicatorTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showPageIndicator = false);
+    });
+  }
+
+  Widget _buildViewer() {
+    final common = (SfPdfViewer viewer) => Listener(
+          onPointerDown: (_) => _revealPageIndicator(),
+          child: RepaintBoundary(child: viewer),
+        );
+
+    if (_localPdfFile != null) {
+      return common(SfPdfViewer.file(
+        _localPdfFile!,
+        key: _pdfViewerKey,
+        controller: _pdfViewerController,
+        canShowScrollHead: false,
+        enableHyperlinkNavigation: false,
+        onDocumentLoaded: _onDocumentLoaded,
+        onPageChanged: _onPageChanged,
+        onTextSelectionChanged: _onTextSelectionChanged,
+        onAnnotationAdded: _handleAnnotationAdded,
+      ));
+    }
+
+    return common(SfPdfViewer.network(
+      widget.paper.sourceUrl,
+      key: _pdfViewerKey,
+      controller: _pdfViewerController,
+      canShowScrollHead: false,
+      enableHyperlinkNavigation: false,
+      onDocumentLoaded: _onDocumentLoaded,
+      onPageChanged: _onPageChanged,
+      onTextSelectionChanged: _onTextSelectionChanged,
+      onAnnotationAdded: _handleAnnotationAdded,
+    ));
   }
 
   @override
@@ -108,25 +187,40 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
             ? const Center(
                 child: CircularProgressIndicator(color: AppColors.sageGreen),
               )
-            : (_localPdfFile != null
-                ? SfPdfViewer.file(
-                    _localPdfFile!,
-                    key: _pdfViewerKey,
-                    controller: _pdfViewerController,
-                    canShowScrollHead: false,
-                    onDocumentLoaded: _onDocumentLoaded,
-                    onTextSelectionChanged: _onTextSelectionChanged,
-                    onAnnotationAdded: _handleAnnotationAdded,
-                  )
-                : SfPdfViewer.network(
-                    widget.paper.sourceUrl,
-                    key: _pdfViewerKey,
-                    controller: _pdfViewerController,
-                    canShowScrollHead: false,
-                    onDocumentLoaded: _onDocumentLoaded,
-                    onTextSelectionChanged: _onTextSelectionChanged,
-                    onAnnotationAdded: _handleAnnotationAdded,
-                  )),
+            : Stack(
+                children: [
+                  _buildViewer(),
+                  // Page number indicator
+                  if (_totalPages > 0)
+                    Positioned(
+                      right: 16,
+                      bottom: 24,
+                      child: AnimatedOpacity(
+                        opacity: _showPageIndicator ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 250),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.inkBlack.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '$_currentPage / $_totalPages',
+                            style: const TextStyle(
+                              fontFamily: 'JetBrains Mono',
+                              fontSize: 12,
+                              color: AppColors.paperWhite,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }

@@ -111,15 +111,15 @@ class _AccountCreationScreenState extends State<AccountCreationScreen> {
                     )
                   : OutlinedButton.icon(
                       onPressed: _signInWithGoogle,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.g_mobiledata,
                         size: 24,
-                        color: AppColors.inkBlack,
+                        color: theme.colorScheme.onSurface,
                       ),
                       label: Text(
                         'Continue with Google',
                         style: theme.textTheme.labelMedium?.copyWith(
-                          color: AppColors.inkBlack,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -147,7 +147,7 @@ class _AccountCreationScreenState extends State<AccountCreationScreen> {
                 child: Text(
                   'Continue as Guest',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.inkBlack,
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

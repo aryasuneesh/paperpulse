@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/bookmark.dart';
 import '../../../data/models/paper.dart';
-import '../../../data/repositories/paper_repository.dart';
+import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
 import '../digest/paper_detail_modal.dart';
 import 'providers/bookmark_provider.dart';
-
-final dailyPapersProvider = FutureProvider<List<Paper>>((ref) {
-  return ref.watch(paperRepositoryProvider).fetchDailyPapers();
-});
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -97,7 +92,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildPaperList(BookmarkStatus status) {
-    // Watch the actual state to trigger rebuilds dynamically when a bookmark is added/removed
     final bookmarks = ref.watch(bookmarkProvider);
     final bookmarkedIds = bookmarks
         .where((b) => b.status == status)
@@ -105,71 +99,54 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         .toSet();
 
     if (bookmarkedIds.isEmpty) {
-      return _buildEmptyState(
-        status == BookmarkStatus.unread
-            ? 'No unread papers. Swipe right in Digest to save!'
-            : status == BookmarkStatus.in_progress
-            ? 'No papers in progress.'
-            : 'You haven\'t finished any papers yet.',
-      );
+      return _buildEmptyState(switch (status) {
+        BookmarkStatus.unread =>
+          'No unread papers.\nSwipe right on any card to save one!',
+        BookmarkStatus.in_progress => 'No papers in progress yet.',
+        BookmarkStatus.finished => "You haven't finished any papers yet.",
+      });
     }
 
-    // Usually we would query a database for just these IDs.
-    // For now, we'll fetch all daily papers and filter them.
-    final asyncPapers = ref.watch(dailyPapersProvider);
+    final papersAsync = ref.watch(papersProvider);
 
-    return asyncPapers.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.sageGreen),
-      ),
-      error: (err, stack) => _buildEmptyState('Failed to load papers.'),
+    return papersAsync.when(
+      loading: () =>
+          const Center(child: CircularProgressIndicator(color: AppColors.sageGreen)),
+      error: (_, __) => _buildEmptyState('Failed to load papers.'),
       data: (allPapers) {
-        final filteredPapers = allPapers
-            .where((p) => bookmarkedIds.contains(p.id))
-            .toList();
+        final papers =
+            allPapers.where((p) => bookmarkedIds.contains(p.id)).toList();
 
-        if (filteredPapers.isEmpty) {
-          return _buildEmptyState('Saved papers no longer available.');
+        if (papers.isEmpty) {
+          return _buildEmptyState('Saved papers are no longer in today\'s digest.');
         }
 
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          itemCount: filteredPapers.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemCount: papers.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final paper = filteredPapers[index];
-            return Dismissible(
-              key: ValueKey(paper.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  color: AppColors.cherryBlossom,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: AppColors.inkBlack,
-                ),
+            final paper = papers[index];
+            return _LibraryPaperItem(
+              paper: paper,
+              currentStatus: status,
+              onOpen: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => PaperDetailModal(paper: paper),
               ),
-              onDismissed: (_) {
+              onRemove: () {
                 ref.read(bookmarkProvider.notifier).toggleBookmark(paper);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Removed from Library')),
                 );
               },
-              child: CompactPaperCard(
-                paper: paper,
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => PaperDetailModal(paper: paper),
-                  );
-                },
-              ),
+              onStatusChange: (newStatus) {
+                ref
+                    .read(bookmarkProvider.notifier)
+                    .updateStatus(paper.id, newStatus);
+              },
             );
           },
         );
@@ -184,11 +161,118 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: AppColors.midGray),
         ),
       ),
     );
   }
+}
+
+/// Library list item with swipe-to-delete and a status-change popup menu.
+class _LibraryPaperItem extends StatelessWidget {
+  const _LibraryPaperItem({
+    required this.paper,
+    required this.currentStatus,
+    required this.onOpen,
+    required this.onRemove,
+    required this.onStatusChange,
+  });
+
+  final Paper paper;
+  final BookmarkStatus currentStatus;
+  final VoidCallback onOpen;
+  final VoidCallback onRemove;
+  final ValueChanged<BookmarkStatus> onStatusChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dismissible(
+      key: ValueKey(paper.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: AppColors.cherryBlossom,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete_outline, color: AppColors.inkBlack),
+      ),
+      onDismissed: (_) => onRemove(),
+      child: Stack(
+        children: [
+          CompactPaperCard(paper: paper, onTap: onOpen),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: _StatusMenu(
+              current: currentStatus,
+              theme: theme,
+              onSelect: onStatusChange,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusMenu extends StatelessWidget {
+  const _StatusMenu({
+    required this.current,
+    required this.theme,
+    required this.onSelect,
+  });
+
+  final BookmarkStatus current;
+  final ThemeData theme;
+  final ValueChanged<BookmarkStatus> onSelect;
+
+  static const _labels = {
+    BookmarkStatus.unread: 'Unread',
+    BookmarkStatus.in_progress: 'In Progress',
+    BookmarkStatus.finished: 'Finished',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<BookmarkStatus>(
+      tooltip: 'Change status',
+      padding: EdgeInsets.zero,
+      icon: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: _chipColor(current),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: AppColors.lightGray),
+        ),
+        child: Text(
+          _labels[current]!,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: AppColors.sageDark,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      onSelected: onSelect,
+      itemBuilder: (_) => BookmarkStatus.values
+          .where((s) => s != current)
+          .map((s) => PopupMenuItem(
+                value: s,
+                child: Text(_labels[s]!, style: theme.textTheme.bodyMedium),
+              ))
+          .toList(),
+    );
+  }
+
+  Color _chipColor(BookmarkStatus s) => switch (s) {
+        BookmarkStatus.unread => AppColors.sageLight,
+        BookmarkStatus.in_progress => AppColors.morningHaze,
+        BookmarkStatus.finished => AppColors.quietSky,
+      };
 }

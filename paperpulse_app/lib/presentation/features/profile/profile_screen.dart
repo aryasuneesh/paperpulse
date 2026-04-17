@@ -150,7 +150,7 @@ class ProfileScreen extends ConsumerWidget {
                     else
                       ...topTopics.map((entry) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _topicBar(entry.key, entry.value / maxCount),
+                            child: _topicBar(entry.key, entry.value / maxCount, theme),
                           )),
                   ],
                 ),
@@ -162,7 +162,7 @@ class ProfileScreen extends ConsumerWidget {
               _tile('Digest Schedule', Icons.calendar_today, theme,
                   onTap: () => _showScheduleModal(context, theme)),
               _tile('Interest Topics', Icons.tag, theme,
-                  onTap: () => context.push('/onboarding/interests')),
+                  onTap: () => context.push('/onboarding/interests?from=profile')),
               _tile('Notifications', Icons.notifications_outlined, theme,
                   onTap: () => _showNotificationsSheet(context, theme)),
               _tile('Account', Icons.person_outline, theme,
@@ -200,9 +200,10 @@ class ProfileScreen extends ConsumerWidget {
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
-              fontFamily: 'Geist Mono',
+              fontFamily: 'JetBrains Mono',
               fontSize: 9,
               letterSpacing: 0.5,
+              color: AppColors.inkBlack,
             ),
           ),
         ],
@@ -210,14 +211,14 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _topicBar(String topic, double fillPercent) {
+  Widget _topicBar(String topic, double fillPercent, ThemeData theme) {
     return Row(
       children: [
         SizedBox(
           width: 120,
           child: Text(topic,
-              style:
-                  const TextStyle(fontSize: 13, color: AppColors.darkGray)),
+              style: TextStyle(
+                  fontSize: 13, color: theme.colorScheme.onSurface)),
         ),
         Expanded(
           child: Stack(
@@ -249,7 +250,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget _tile(String title, IconData icon, ThemeData theme,
       {required VoidCallback onTap}) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.inkBlack),
+      leading: Icon(icon, color: theme.colorScheme.onSurface),
       title: Text(title,
           style: theme.textTheme.bodyMedium
               ?.copyWith(fontWeight: FontWeight.w500)),
@@ -263,7 +264,7 @@ class ProfileScreen extends ConsumerWidget {
   void _showScheduleModal(BuildContext context, ThemeData theme) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.paperWhite,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -324,7 +325,7 @@ class ProfileScreen extends ConsumerWidget {
   void _showNotificationsSheet(BuildContext context, ThemeData theme) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.paperWhite,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -342,7 +343,7 @@ class ProfileScreen extends ConsumerWidget {
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.paperWhite,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),

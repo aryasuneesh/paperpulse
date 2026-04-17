@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/paper.dart';
-import '../../../../data/repositories/paper_repository.dart';
+import '../../../../data/providers/papers_provider.dart';
 
 final digestStackProvider =
     NotifierProvider<DigestStackNotifier, DigestStackState>(
@@ -41,20 +41,29 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
   @override
   DigestStackState build() {
     ref.onDispose(() => _disposed = true);
-    _loadPapers();
-    return DigestStackState(papers: [], currentIndex: 0, isLoading: true);
-  }
 
-  Future<void> _loadPapers() async {
-    try {
-      final repository = ref.read(paperRepositoryProvider);
-      final papers = await repository.fetchDailyPapers();
-      if (_disposed) return;
-      state = state.copyWith(papers: papers, isLoading: false, error: null);
-    } catch (e) {
-      if (_disposed) return;
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
+    // Listen to the shared cached provider
+    final papersAsync = ref.watch(papersProvider);
+    papersAsync.when(
+      loading: () {},
+      error: (e, _) {
+        if (!_disposed) {
+          state = state.copyWith(isLoading: false, error: e.toString());
+        }
+      },
+      data: (papers) {
+        if (!_disposed) {
+          state = state.copyWith(papers: papers, isLoading: false, error: null);
+        }
+      },
+    );
+
+    return DigestStackState(
+      papers: papersAsync.valueOrNull ?? [],
+      currentIndex: 0,
+      isLoading: papersAsync.isLoading,
+      error: papersAsync.hasError ? papersAsync.error.toString() : null,
+    );
   }
 
   void swipeCard() {
