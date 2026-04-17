@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
+import '../../../../main.dart' show sharedPrefs;
 import '../../../core/theme/app_colors.dart';
+
+const onboardingCompleteKey = 'onboarding_complete';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,27 +19,24 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        _opacity = 1.0;
-      });
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          context.go('/onboarding/welcome');
-        }
-      });
+      setState(() => _opacity = 1.0);
+      Future.delayed(const Duration(seconds: 2), _navigate);
     });
+  }
+
+  void _navigate() {
+    if (!mounted) return;
+    final completed = sharedPrefs.getBool(onboardingCompleteKey) ?? false;
+    context.go(completed ? '/digest' : '/onboarding/welcome');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: AppColors.paperWhite,
       body: InkWell(
-        onTap: () {
-          context.go('/onboarding/welcome');
-        },
+        onTap: _navigate,
         child: Center(
           child: AnimatedOpacity(
             opacity: _opacity,
