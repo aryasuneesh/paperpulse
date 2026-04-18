@@ -9,21 +9,22 @@ import 'paper_detail_modal.dart';
 import 'providers/digest_stack_provider.dart';
 import 'providers/streak_provider.dart';
 import 'share_card_sheet.dart';
+import 'widgets/streak_popup.dart';
 
 class DigestScreen extends ConsumerWidget {
   const DigestScreen({super.key});
 
-  void _onSwipe(
+  Future<void> _onSwipe(
     BuildContext context,
     WidgetRef ref,
     bool isRight,
     int maxPapers,
-  ) {
+  ) async {
     final currentIndex = ref.read(digestStackProvider).currentIndex;
     if (currentIndex < maxPapers) {
       if (isRight) {
-        // Save to bookmark
-        final currentPaper = ref.read(digestStackProvider).papers[currentIndex];
+        final currentPaper =
+            ref.read(digestStackProvider).papers[currentIndex];
         final bookmarkNotifier = ref.read(bookmarkProvider.notifier);
 
         Future.delayed(const Duration(milliseconds: 250), () {
@@ -44,7 +45,11 @@ class DigestScreen extends ConsumerWidget {
         });
       }
       ref.read(digestStackProvider.notifier).swipeCard();
-      ref.read(streakProvider.notifier).markActivity();
+      final didIncrement =
+          await ref.read(streakProvider.notifier).markActivity();
+      if (context.mounted && didIncrement) {
+        await StreakPopup.show(context, ref.read(streakProvider));
+      }
     }
   }
 
