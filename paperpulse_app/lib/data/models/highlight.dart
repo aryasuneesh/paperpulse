@@ -31,6 +31,8 @@ class Highlight {
   final String annotationName;
   final List<String> tags;
   final DateTime createdAt;
+  final String readerType;  // 'pdf' | 'html'
+  final String? searchText; // HTML only: full sentence for window.find()
 
   Highlight({
     required this.id,
@@ -42,6 +44,8 @@ class Highlight {
     required this.annotationName,
     this.tags = const [],
     required this.createdAt,
+    this.readerType = 'pdf',
+    this.searchText,
   });
 
   factory Highlight.fromJson(Map<String, dynamic> json) {
@@ -55,6 +59,8 @@ class Highlight {
       annotationName: json['annotationName'] as String? ?? '',
       tags: List<String>.from(json['tags'] ?? []),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      readerType: json['readerType'] as String? ?? 'pdf',
+      searchText: json['searchText'] as String?,
     );
   }
 
@@ -69,6 +75,8 @@ class Highlight {
       'annotationName': annotationName,
       'tags': tags,
       'createdAt': createdAt.toIso8601String(),
+      'readerType': readerType,
+      'searchText': searchText,
     };
   }
 
@@ -82,6 +90,8 @@ class Highlight {
     String? annotationName,
     List<String>? tags,
     DateTime? createdAt,
+    String? readerType,
+    String? searchText,
   }) {
     return Highlight(
       id: id ?? this.id,
@@ -93,6 +103,8 @@ class Highlight {
       annotationName: annotationName ?? this.annotationName,
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
+      readerType: readerType ?? this.readerType,
+      searchText: searchText ?? this.searchText,
     );
   }
 }
