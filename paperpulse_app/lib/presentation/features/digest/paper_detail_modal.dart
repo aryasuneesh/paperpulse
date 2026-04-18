@@ -5,8 +5,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
 import '../../common_widgets/curiosity_card.dart';
 import '../library/providers/bookmark_provider.dart';
+import 'html_reader_screen.dart';
 import 'pdf_reader_screen.dart';
+import 'providers/streak_provider.dart';
 import 'share_card_sheet.dart';
+import 'widgets/streak_popup.dart';
 
 class PaperDetailModal extends ConsumerWidget {
   const PaperDetailModal({required this.paper, super.key});
@@ -22,9 +25,35 @@ class PaperDetailModal extends ConsumerWidget {
     );
   }
 
+  Future<void> _openReader(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool useHtml,
+  }) async {
+    ref.read(bookmarkProvider.notifier).markAsInProgress(paper);
+    final didIncrement =
+        await ref.read(streakProvider.notifier).markActivity();
+    if (!context.mounted) return;
+    if (didIncrement) {
+      await StreakPopup.show(context, ref.read(streakProvider));
+      if (!context.mounted) return;
+    }
+    Navigator.pop(context); // close modal
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => useHtml
+            ? HtmlReaderScreen(paper: paper)
+            : PdfReaderScreen(paper: paper),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isArxiv = paper.source == PaperSource.arxiv;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.9,
@@ -40,7 +69,6 @@ class PaperDetailModal extends ConsumerWidget {
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 48),
             children: [
-              // Drag Handle
               Center(
                 child: Container(
                   margin: const EdgeInsets.symmetric(vertical: 12),
@@ -53,7 +81,6 @@ class PaperDetailModal extends ConsumerWidget {
                 ),
               ),
 
-              // Curiosity Card header
               CuriosityCard(
                 paper: paper,
                 isScrollable: false,
@@ -71,19 +98,15 @@ class PaperDetailModal extends ConsumerWidget {
                   );
                 },
                 onShareTap: () => ShareCardSheet.show(context, paper),
-                onReadFullTap: () {
-                  ref.read(bookmarkProvider.notifier).markAsInProgress(paper);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PdfReaderScreen(paper: paper),
-                    ),
-                  );
-                },
+                onReadPdfTap: () =>
+                    _openReader(context, ref, useHtml: false),
+                onReadHtmlTap: isArxiv
+                    ? () => _openReader(context, ref, useHtml: true)
+                    : null,
               ),
+
               const SizedBox(height: 32),
 
-              // About this paper
               Text(
                 'About this paper',
                 style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20),
@@ -99,7 +122,6 @@ class PaperDetailModal extends ConsumerWidget {
 
               const SizedBox(height: 32),
 
-              // Authors
               Text(
                 'Authors',
                 style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20),
@@ -125,25 +147,49 @@ class PaperDetailModal extends ConsumerWidget {
 
               const SizedBox(height: 48),
 
-              // Full CTA
-              ElevatedButton(
-                onPressed: () {
-                  ref.read(bookmarkProvider.notifier).markAsInProgress(paper);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PdfReaderScreen(paper: paper),
+              // Bottom CTA — two buttons for ArXiv, one for others
+              if (isArxiv)
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            _openReader(context, ref, useHtml: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          side: const BorderSide(color: AppColors.midGray),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Open PDF'),
+                      ),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            _openReader(context, ref, useHtml: true),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                        ),
+                        child: const Text('Open HTML'),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                ElevatedButton(
+                  onPressed: () =>
+                      _openReader(context, ref, useHtml: false),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                  ),
+                  child: const Text(
+                    'Read Full Paper →',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
-                child: const Text(
-                  'Read Full Paper →',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
             ],
           ),
         );
@@ -169,7 +215,8 @@ class PaperDetailModal extends ConsumerWidget {
             value,
             style: TextStyle(
               color: isHighlight ? AppColors.sageDark : AppColors.inkBlack,
-              fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
+              fontWeight:
+                  isHighlight ? FontWeight.bold : FontWeight.w500,
               fontFamily: isHighlight ? 'JetBrains Mono' : 'Quicksand',
               fontSize: 14,
             ),
