@@ -9,6 +9,8 @@ class CuriosityCard extends StatelessWidget {
     this.onBookmarkTap,
     this.onShareTap,
     this.onReadFullTap,
+    this.onReadPdfTap,
+    this.onReadHtmlTap,
     this.isScrollable = true,
     super.key,
   });
@@ -16,14 +18,18 @@ class CuriosityCard extends StatelessWidget {
   final Paper paper;
   final VoidCallback? onBookmarkTap;
   final VoidCallback? onShareTap;
+  /// Legacy: used in digest stack to open PaperDetailModal.
   final VoidCallback? onReadFullTap;
+  /// Two-button mode: open PDF reader directly.
+  final VoidCallback? onReadPdfTap;
+  /// Two-button mode: open HTML reader directly (ArXiv only).
+  final VoidCallback? onReadHtmlTap;
   final bool isScrollable;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Dark card for CuriosityCard (Ink Black background)
     return Container(
       decoration: BoxDecoration(
         color: AppColors.inkBlack,
@@ -41,13 +47,11 @@ class CuriosityCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.max,
         children: [
-          // Top Row: Topic Tag and Source Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [_buildTopicTag(theme), _buildSourceBadge(theme)],
           ),
           const SizedBox(height: 16),
-          // Paper Title
           Text(
             paper.title,
             style: theme.textTheme.titleLarge?.copyWith(
@@ -57,7 +61,6 @@ class CuriosityCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
-          // Author metadata
           Text(
             _formatAuthors(),
             style: theme.textTheme.labelSmall?.copyWith(
@@ -67,7 +70,6 @@ class CuriosityCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 24),
-          // Curiosity Hook Synopsis
           if (isScrollable)
             Expanded(
               child: SingleChildScrollView(
@@ -88,22 +90,8 @@ class CuriosityCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 32),
-          // CTA Button
-          ElevatedButton(
-            onPressed: onReadFullTap,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: AppColors.sageGreen,
-              foregroundColor: AppColors.inkBlack,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-            child: const Text('Read Full Paper →'),
-          ),
+          _buildCta(theme),
           const SizedBox(height: 24),
-          // Action Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -126,6 +114,78 @@ class CuriosityCard extends StatelessWidget {
     );
   }
 
+  Widget _buildCta(ThemeData theme) {
+    // Two-button mode: PDF + HTML
+    if (onReadPdfTap != null && onReadHtmlTap != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onReadPdfTap,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: AppColors.paperWhite,
+                side: const BorderSide(color: AppColors.midGray),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Open PDF'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: onReadHtmlTap,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                backgroundColor: AppColors.sageGreen,
+                foregroundColor: AppColors.inkBlack,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text('Open HTML'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Single PDF button (non-ArXiv two-button mode)
+    if (onReadPdfTap != null) {
+      return ElevatedButton(
+        onPressed: onReadPdfTap,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: AppColors.sageGreen,
+          foregroundColor: AppColors.inkBlack,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+        child: const Text('Open PDF'),
+      );
+    }
+
+    // Legacy single button (opens modal from digest stack)
+    return ElevatedButton(
+      onPressed: onReadFullTap,
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        backgroundColor: AppColors.sageGreen,
+        foregroundColor: AppColors.inkBlack,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 0,
+      ),
+      child: const Text('Read Full Paper →'),
+    );
+  }
+
   Widget _buildTopicTag(ThemeData theme) {
     if (paper.topicTags.isEmpty) return const SizedBox();
     return Container(
@@ -139,8 +199,8 @@ class CuriosityCard extends StatelessWidget {
         paper.topicTags.first.toUpperCase(),
         style: theme.textTheme.labelSmall?.copyWith(
           color: AppColors.sageGreen,
-          fontWeight: FontWeight.bold, // fallback for Geist Mono
-        ), // Typically handled by tag style in typography
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
