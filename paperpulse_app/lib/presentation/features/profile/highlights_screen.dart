@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/highlight.dart';
 import '../../../data/models/paper.dart';
-import '../library/library_screen.dart';
+import '../../../data/providers/papers_provider.dart';
 import '../library/providers/highlight_provider.dart';
 import '../digest/pdf_reader_screen.dart';
 
@@ -162,7 +162,7 @@ class _HighlightsScreenState extends ConsumerState<HighlightsScreen> {
         }
 
         // Fetch the associated paper to open reader
-        final asyncPapers = ref.read(dailyPapersProvider);
+        final asyncPapers = ref.read(papersProvider);
 
         final paper = asyncPapers.maybeWhen(
           data: (papers) => papers.firstWhere(

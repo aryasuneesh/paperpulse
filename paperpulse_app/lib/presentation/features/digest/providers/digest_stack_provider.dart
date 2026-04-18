@@ -59,7 +59,7 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
     );
 
     return DigestStackState(
-      papers: papersAsync.valueOrNull ?? [],
+      papers: papersAsync.asData?.value ?? [],
       currentIndex: 0,
       isLoading: papersAsync.isLoading,
       error: papersAsync.hasError ? papersAsync.error.toString() : null,

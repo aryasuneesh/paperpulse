@@ -96,113 +96,126 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
         color: AppColors.paperWhite,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: AppColors.lightGray,
-                borderRadius: BorderRadius.circular(2),
+      // Let the sheet scroll on small devices
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24, 12, 24, MediaQuery.of(context).viewInsets.bottom + 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.lightGray,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
 
-          Text('Share Paper', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 4),
-          Text(
-            'Choose a style and share with your network.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
-          ),
-          const SizedBox(height: 24),
-
-          // Card preview
-          Center(
-            child: SharePaperCard(
-              key: _cardKey,
-              paper: widget.paper,
-              isPro: false,
-              backgroundColor: _bgColor,
-              textColor: _textColor,
+            Text('Share Paper', style: theme.textTheme.headlineMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Choose a style and share with your network.',
+              style:
+                  theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
             ),
-          ),
+            const SizedBox(height: 24),
 
-          const SizedBox(height: 24),
-
-          // Theme selector
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ThemeOption(
-                label: 'Dark',
-                bgColor: AppColors.inkBlack,
-                textColor: AppColors.paperWhite,
-                isSelected: _selectedTheme == _CardTheme.dark,
-                onTap: () => setState(() => _selectedTheme = _CardTheme.dark),
+            // Card preview — centred, never overflows
+            Center(
+              child: SharePaperCard(
+                key: _cardKey,
+                paper: widget.paper,
+                isPro: false,
+                backgroundColor: _bgColor,
+                textColor: _textColor,
               ),
-              const SizedBox(width: 12),
-              _ThemeOption(
-                label: 'Light',
-                bgColor: AppColors.paperWhite,
-                textColor: AppColors.inkBlack,
-                isSelected: _selectedTheme == _CardTheme.light,
-                onTap: () => setState(() => _selectedTheme = _CardTheme.light),
-              ),
-              const SizedBox(width: 12),
-              _ThemeOption(
-                label: 'Sage',
-                bgColor: AppColors.sageLight,
-                textColor: AppColors.inkBlack,
-                isSelected: _selectedTheme == _CardTheme.sage,
-                onTap: () => setState(() => _selectedTheme = _CardTheme.sage),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 32),
-
-          // Action buttons
-          ElevatedButton.icon(
-            onPressed: _isExporting ? null : _share,
-            icon: _isExporting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.inkBlack,
-                    ),
-                  )
-                : const Icon(Icons.ios_share),
-            label:
-                Text(_isExporting ? 'Preparing...' : 'Share Image'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: AppColors.inkBlack,
-              foregroundColor: AppColors.paperWhite,
             ),
-          ),
 
-          const SizedBox(height: 12),
+            const SizedBox(height: 20),
 
-          OutlinedButton.icon(
-            onPressed: _copyLink,
-            icon: const Icon(Icons.link),
-            label: const Text('Share Paper Link'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              side: const BorderSide(color: AppColors.lightGray),
-              foregroundColor: AppColors.inkBlack,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+            // Theme selector
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _ThemeOption(
+                  label: 'Dark',
+                  bgColor: AppColors.inkBlack,
+                  textColor: AppColors.paperWhite,
+                  isSelected: _selectedTheme == _CardTheme.dark,
+                  onTap: () => setState(() => _selectedTheme = _CardTheme.dark),
+                ),
+                const SizedBox(width: 12),
+                _ThemeOption(
+                  label: 'Light',
+                  bgColor: AppColors.paperWhite,
+                  textColor: AppColors.inkBlack,
+                  isSelected: _selectedTheme == _CardTheme.light,
+                  onTap: () =>
+                      setState(() => _selectedTheme = _CardTheme.light),
+                ),
+                const SizedBox(width: 12),
+                _ThemeOption(
+                  label: 'Sage',
+                  bgColor: AppColors.sageLight,
+                  textColor: AppColors.inkBlack,
+                  isSelected: _selectedTheme == _CardTheme.sage,
+                  onTap: () => setState(() => _selectedTheme = _CardTheme.sage),
+                ),
+              ],
             ),
-          ),
-        ],
+
+            const SizedBox(height: 28),
+
+            // Share Image — full width
+            ElevatedButton.icon(
+              onPressed: _isExporting ? null : _share,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.inkBlack,
+                      ),
+                    )
+                  : const Icon(Icons.ios_share),
+              label: Text(_isExporting ? 'Preparing...' : 'Share Image'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                padding: const EdgeInsets.symmetric(
+                    vertical: 16, horizontal: 24),
+                backgroundColor: AppColors.inkBlack,
+                foregroundColor: AppColors.paperWhite,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Share Link — full width
+            OutlinedButton.icon(
+              onPressed: _copyLink,
+              icon: const Icon(Icons.link),
+              label: const Text('Share Paper Link'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                padding: const EdgeInsets.symmetric(
+                    vertical: 14, horizontal: 24),
+                side: const BorderSide(color: AppColors.lightGray),
+                foregroundColor: AppColors.inkBlack,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -32,31 +32,27 @@ class SharePaperCardState extends State<SharePaperCard> {
           boundaryKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
       if (boundary == null) return null;
-
-      // Capture at 3x for high resolution
+      // 3× pixel ratio → 1080×1350 export (4:5 feed format)
       return await boundary.toImage(pixelRatio: 3.0);
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Note: The actual share card in production might want to be rendered
-    // off-screen or within an InteractiveViewer for preview.
-    // Here we define the visual layout for capturing.
+    // Display at 4:5 (360×450 logical px). Export at 3× = 1080×1350.
     return RepaintBoundary(
       key: boundaryKey,
       child: Container(
-        width:
-            1080 /
-            3, // Scaled down for screen viewing, but pixelRatio: 3.0 scales it up for export
-        height: 1920 / 3, // Assuming Stories format (16:9)
+        width: 360,
+        height: 450,
         color: widget.backgroundColor,
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Top row: source badge + wordmark
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -64,84 +60,101 @@ class SharePaperCardState extends State<SharePaperCard> {
                 Text(
                   'PaperPulse',
                   style: TextStyle(
-                    fontFamily: 'Instrument Serif',
-                    fontSize: 18,
+                    fontFamily: 'DreamOrphans',
+                    fontSize: 14,
                     color: widget.textColor.withOpacity(0.5),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 48),
-            if (widget.paper.topicTags.isNotEmpty) _buildTopicTag(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // Topic tag
+            if (widget.paper.topicTags.isNotEmpty) ...[
+              _buildTopicTag(),
+              const SizedBox(height: 12),
+            ],
+
+            // Paper title — Instrument Serif
             Text(
               widget.paper.title,
               style: TextStyle(
                 fontFamily: 'Instrument Serif',
-                fontSize: 36,
+                fontSize: 22,
                 color: widget.textColor,
-                height: 1.1,
+                height: 1.15,
               ),
-              maxLines: 4,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
+
             Container(height: 1, color: AppColors.sageGreen),
-            const SizedBox(height: 32),
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: AppColors.sageGreen, width: 4),
+            const SizedBox(height: 16),
+
+            // Hook quote — Quicksand
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: AppColors.sageGreen, width: 3),
+                  ),
+                ),
+                padding: const EdgeInsets.only(left: 12),
+                child: Text(
+                  '"${_getHookSummary()}"',
+                  style: TextStyle(
+                    fontFamily: 'Quicksand',
+                    fontStyle: FontStyle.italic,
+                    fontSize: 13,
+                    height: 1.6,
+                    color: widget.textColor.withOpacity(0.9),
+                  ),
+                  overflow: TextOverflow.fade,
                 ),
               ),
-              padding: const EdgeInsets.only(left: 16),
-              child: Text(
-                '"${_getHookSummary()}"',
-                style: TextStyle(
-                  fontFamily: 'Instrument Serif',
-                  fontStyle: FontStyle.italic,
-                  fontSize: 18,
-                  color: widget.textColor,
-                ),
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-              ),
             ),
-            const SizedBox(height: 32),
+
+            const SizedBox(height: 16),
             Container(height: 1, color: AppColors.sageGreen),
-            const Spacer(),
+            const SizedBox(height: 12),
+
+            // Footer: authors + QR placeholder
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Text(
                     '${_formatAuthors()}  •  ${widget.paper.publishedAt.year}',
                     style: TextStyle(
                       fontFamily: 'JetBrains Mono',
-                      fontSize: 12,
-                      color: widget.textColor.withOpacity(0.7),
+                      fontSize: 10,
+                      color: widget.textColor.withOpacity(0.6),
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // Placeholder for QR code
+                const SizedBox(width: 8),
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 44,
+                  height: 44,
                   color: Colors.white,
                   child: const Center(
-                    child: Icon(Icons.qr_code_2, size: 48, color: Colors.black),
+                    child: Icon(Icons.qr_code_2, size: 36, color: Colors.black),
                   ),
                 ),
               ],
             ),
+
             if (!widget.isPro) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Center(
                 child: Text(
                   'paperpulse.app',
                   style: TextStyle(
                     fontFamily: 'JetBrains Mono',
-                    fontSize: 10,
+                    fontSize: 9,
                     color: widget.textColor.withOpacity(0.3),
                   ),
                 ),
@@ -155,7 +168,7 @@ class SharePaperCardState extends State<SharePaperCard> {
 
   Widget _buildSourceBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         border: Border.all(color: widget.textColor.withOpacity(0.3)),
         borderRadius: BorderRadius.circular(100),
@@ -164,29 +177,33 @@ class SharePaperCardState extends State<SharePaperCard> {
         widget.paper.source.name.toUpperCase(),
         style: TextStyle(
           fontFamily: 'Quicksand',
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
           color: widget.textColor,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
   Widget _buildTopicTag() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.sageLight,
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Text(
-        widget.paper.topicTags.first.toUpperCase(),
-        style: const TextStyle(
-          fontFamily: 'JetBrains Mono',
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: AppColors.sageDark,
-          letterSpacing: 1.2,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.sageLight,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          widget.paper.topicTags.first.toUpperCase(),
+          style: const TextStyle(
+            fontFamily: 'JetBrains Mono',
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: AppColors.sageDark,
+            letterSpacing: 0.8,
+          ),
         ),
       ),
     );
@@ -199,15 +216,24 @@ class SharePaperCardState extends State<SharePaperCard> {
   }
 
   String _getHookSummary() {
-    // Just a placeholder to get the first sentence or so of the hook
     final hook = widget.paper.curiosityHook;
-    final dotIndex = hook.indexOf('.');
-    if (dotIndex != -1 && dotIndex < 100) {
-      return '${hook.substring(0, dotIndex)}.';
+    // First 2 sentences or 180 chars, whichever is shorter
+    final secondDot = _nthDot(hook, 2);
+    if (secondDot != -1 && secondDot < 180) {
+      return hook.substring(0, secondDot + 1);
     }
-    if (hook.length > 100) {
-      return '${hook.substring(0, 100)}...';
-    }
+    if (hook.length > 180) return '${hook.substring(0, 180)}…';
     return hook;
+  }
+
+  int _nthDot(String s, int n) {
+    int count = 0;
+    for (int i = 0; i < s.length; i++) {
+      if (s[i] == '.') {
+        count++;
+        if (count == n) return i;
+      }
+    }
+    return -1;
   }
 }
