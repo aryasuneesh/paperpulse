@@ -95,7 +95,6 @@ class SharePaperCardState extends State<SharePaperCard> {
                     height: 1.6,
                     color: widget.textColor.withOpacity(0.9),
                   ),
-                  overflow: TextOverflow.fade,
                 ),
               ),
             ),
