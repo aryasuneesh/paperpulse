@@ -41,7 +41,8 @@ class StreakNotifier extends Notifier<int> {
     final lastDateStr = prefs.getString(_streakLastDateKey);
 
     if (lastDateStr != null) {
-      final lastDate = DateTime.parse(lastDateStr);
+      final parsed = DateTime.parse(lastDateStr);
+      final lastDate = DateTime(parsed.year, parsed.month, parsed.day);
 
       if (lastDate == today) {
         // Already counted today — ensure state reflects persisted count.

@@ -39,7 +39,6 @@ class PaperDetailModal extends ConsumerWidget {
       if (!context.mounted) return;
     }
     Navigator.pop(context); // close modal
-    if (!context.mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(

@@ -9,14 +9,12 @@ import '../../../data/models/paper.dart';
 class SharePaperCard extends StatefulWidget {
   const SharePaperCard({
     required this.paper,
-    required this.isPro,
     this.backgroundColor = AppColors.inkBlack,
     this.textColor = AppColors.paperWhite,
     super.key,
   });
 
   final Paper paper;
-  final bool isPro;
   final Color backgroundColor;
   final Color textColor;
 

@@ -7,6 +7,7 @@ import '../../../data/models/paper.dart';
 import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
 import '../digest/paper_detail_modal.dart';
+import 'highlights_section.dart';
 import 'providers/bookmark_provider.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
@@ -23,7 +24,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -68,6 +69,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                     Tab(text: 'Unread'),
                     Tab(text: 'In Progress'),
                     Tab(text: 'Finished'),
+                    Tab(text: 'Highlights'),
                   ],
                 ),
               ),
@@ -82,6 +84,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                   _buildPaperList(BookmarkStatus.unread),
                   _buildPaperList(BookmarkStatus.in_progress),
                   _buildPaperList(BookmarkStatus.finished),
+                  const HighlightsSection(),
                 ],
               ),
             ),

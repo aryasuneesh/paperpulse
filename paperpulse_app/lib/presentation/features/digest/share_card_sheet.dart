@@ -131,7 +131,6 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
               child: SharePaperCard(
                 key: _cardKey,
                 paper: widget.paper,
-                isPro: false,
                 backgroundColor: _bgColor,
                 textColor: _textColor,
               ),

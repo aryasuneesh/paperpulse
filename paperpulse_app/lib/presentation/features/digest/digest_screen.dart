@@ -27,21 +27,19 @@ class DigestScreen extends ConsumerWidget {
             ref.read(digestStackProvider).papers[currentIndex];
         final bookmarkNotifier = ref.read(bookmarkProvider.notifier);
 
+        final messenger = ScaffoldMessenger.of(context);
         Future.delayed(const Duration(milliseconds: 250), () {
           bookmarkNotifier.toggleBookmark(currentPaper);
-
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Saved to Library',
-                  style: TextStyle(color: AppColors.inkBlack),
-                ),
-                backgroundColor: AppColors.sageGreen,
-                duration: Duration(seconds: 1),
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Saved to Library',
+                style: TextStyle(color: AppColors.inkBlack),
               ),
-            );
-          }
+              backgroundColor: AppColors.sageGreen,
+              duration: Duration(seconds: 1),
+            ),
+          );
         });
       }
       ref.read(digestStackProvider.notifier).swipeCard();
