@@ -9,14 +9,41 @@ import '../../../data/models/paper.dart';
 class SharePaperCard extends StatefulWidget {
   const SharePaperCard({
     required this.paper,
+    this.customQuote,
     this.backgroundColor = AppColors.inkBlack,
     this.textColor = AppColors.paperWhite,
     super.key,
   });
 
   final Paper paper;
+  final String? customQuote;
   final Color backgroundColor;
   final Color textColor;
+
+  /// Extracts as many complete sentences as fit within [maxChars], always
+  /// filling as much space as possible. Falls back to a hard truncation.
+  static String extractQuote(String text, {int maxChars = 520}) {
+    final trimmed = text.trim();
+    final parts = trimmed.split(RegExp(r'(?<=[.!?])\s+'));
+
+    // Greedily append sentences while staying under the limit
+    String result = '';
+    for (final sentence in parts) {
+      final candidate = result.isEmpty ? sentence : '$result $sentence';
+      if (candidate.length <= maxChars) {
+        result = candidate;
+      } else {
+        break;
+      }
+    }
+    if (result.isNotEmpty) return result;
+
+    // No complete sentence fit — hard-truncate at word boundary
+    if (trimmed.length <= maxChars) return trimmed;
+    final truncated = trimmed.substring(0, maxChars);
+    final lastSpace = truncated.lastIndexOf(' ');
+    return '${lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated}...';
+  }
 
   @override
   State<SharePaperCard> createState() => SharePaperCardState();
@@ -50,12 +77,23 @@ class SharePaperCardState extends State<SharePaperCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Row 1: source badge + topic tag on same line
+            // Row 1: source badge + topic tag on same line, app name on right
             Row(
               children: [
                 _buildSourceBadge(),
                 const SizedBox(width: 8),
                 if (widget.paper.topicTags.isNotEmpty) _buildTopicTag(),
+                const Spacer(),
+                Text(
+                  'PaperPulse',
+                  style: TextStyle(
+                    fontFamily: 'DreamOrphans',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: widget.textColor.withOpacity(0.5),
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 14),
@@ -75,7 +113,7 @@ class SharePaperCardState extends State<SharePaperCard> {
             Container(height: 1, color: AppColors.sageGreen),
             const SizedBox(height: 14),
 
-            // Hook quote — full text, no truncation
+            // Quote — highlight text (truncated to 1-2 sentences) or curiosity hook
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -85,7 +123,9 @@ class SharePaperCardState extends State<SharePaperCard> {
                 ),
                 padding: const EdgeInsets.only(left: 12),
                 child: Text(
-                  '"${widget.paper.curiosityHook}"',
+                  '"${widget.customQuote != null ? SharePaperCard.extractQuote(widget.customQuote!) : widget.paper.curiosityHook}"',
+                  maxLines: 8,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Quicksand',
                     fontStyle: FontStyle.italic,
@@ -161,11 +201,15 @@ class SharePaperCardState extends State<SharePaperCard> {
   }
 
   Widget _buildTopicTag() {
+    final sageBackground = widget.backgroundColor == AppColors.sageLight;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.sageLight,
+        color: sageBackground ? Colors.transparent : AppColors.sageLight,
         borderRadius: BorderRadius.circular(100),
+        border: sageBackground
+            ? Border.all(color: Colors.white, width: 1)
+            : null,
       ),
       child: Text(
         widget.paper.topicTags.first.toUpperCase(),

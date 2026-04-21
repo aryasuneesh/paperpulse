@@ -63,7 +63,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                   ),
                   labelColor: AppColors.paperWhite,
                   unselectedLabelColor: AppColors.midGray,
-                  labelStyle: theme.textTheme.labelMedium,
+                  labelStyle: theme.textTheme.labelMedium
+                      ?.copyWith(fontSize: 12),
+                  unselectedLabelStyle: theme.textTheme.labelMedium
+                      ?.copyWith(fontSize: 12),
                   dividerColor: Colors.transparent,
                   tabs: const [
                     Tab(text: 'Unread'),

@@ -6,7 +6,9 @@ import '../../../data/models/highlight.dart';
 import '../../../data/models/paper.dart';
 import '../../../data/providers/papers_provider.dart';
 import '../library/providers/highlight_provider.dart';
+import '../digest/html_reader_screen.dart';
 import '../digest/pdf_reader_screen.dart';
+import '../digest/share_card_sheet.dart';
 
 class HighlightsScreen extends ConsumerStatefulWidget {
   const HighlightsScreen({super.key});
@@ -105,6 +107,7 @@ class _HighlightsScreenState extends ConsumerState<HighlightsScreen> {
           _selectedIds.isNotEmpty
               ? '${_selectedIds.length} Selected'
               : 'Highlights',
+          style: const TextStyle(color: AppColors.inkBlack),
         ),
         backgroundColor: _selectedIds.isNotEmpty
             ? AppColors.sageLight
@@ -173,16 +176,23 @@ class _HighlightsScreenState extends ConsumerState<HighlightsScreen> {
         );
 
         if (context.mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PdfReaderScreen(
+          final rootNav = Navigator.of(context, rootNavigator: true);
+          if (highlight.readerType == 'html') {
+            rootNav.push(MaterialPageRoute(
+              builder: (_) => HtmlReaderScreen(
+                paper: paper,
+                initialSearchText: highlight.searchText ?? highlight.textContent,
+              ),
+            ));
+          } else {
+            rootNav.push(MaterialPageRoute(
+              builder: (_) => PdfReaderScreen(
                 paper: paper,
                 initialSearchText: highlight.textContent,
                 initialPageNumber: highlight.pageNumber,
               ),
-            ),
-          );
+            ));
+          }
         }
       },
       child: Container(
@@ -228,8 +238,36 @@ class _HighlightsScreenState extends ConsumerState<HighlightsScreen> {
                     ),
                   ),
                 ),
-                if (isSelected)
-                  const Icon(Icons.check_circle, color: AppColors.sageDark),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        final paper = ref.read(papersProvider).maybeWhen(
+                              data: (papers) => papers.firstWhere(
+                                (p) => p.id == highlight.paperId,
+                                orElse: () => _createFallbackPaper(highlight),
+                              ),
+                              orElse: () => _createFallbackPaper(highlight),
+                            );
+                        ShareCardSheet.show(
+                          context,
+                          paper,
+                          highlightText: highlight.textContent,
+                        );
+                      },
+                      child: const Icon(
+                        Icons.ios_share,
+                        size: 18,
+                        color: AppColors.midGray,
+                      ),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 8),
+                      const Icon(Icons.check_circle, color: AppColors.sageDark),
+                    ],
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -249,15 +287,29 @@ class _HighlightsScreenState extends ConsumerState<HighlightsScreen> {
               children: [
                 ...highlight.tags.map(
                   (tag) => InputChip(
-                    label: Text(tag, style: const TextStyle(fontSize: 12)),
+                    label: Text(
+                      tag,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.inkBlack,
+                      ),
+                    ),
                     backgroundColor: AppColors.paperWhite,
                     deleteIconColor: AppColors.midGray,
+                    side: const BorderSide(color: AppColors.lightGray),
                     onDeleted: () => _removeTag(highlight, tag),
                   ),
                 ),
                 ActionChip(
-                  label: const Text('+ Tag', style: TextStyle(fontSize: 12)),
+                  label: const Text(
+                    '+ Tag',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.sageDark,
+                    ),
+                  ),
                   backgroundColor: AppColors.sageLight,
+                  side: const BorderSide(color: AppColors.sageGreen),
                   onPressed: () => _addTagDialog(highlight),
                 ),
               ],

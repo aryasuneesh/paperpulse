@@ -14,16 +14,17 @@ import '../../common_widgets/share_paper_card.dart';
 enum _CardTheme { dark, light, sage }
 
 class ShareCardSheet extends StatefulWidget {
-  const ShareCardSheet({required this.paper, super.key});
+  const ShareCardSheet({required this.paper, this.highlightText, super.key});
 
   final Paper paper;
+  final String? highlightText;
 
-  static void show(BuildContext context, Paper paper) {
+  static void show(BuildContext context, Paper paper, {String? highlightText}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ShareCardSheet(paper: paper),
+      builder: (_) => ShareCardSheet(paper: paper, highlightText: highlightText),
     );
   }
 
@@ -131,6 +132,7 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
               child: SharePaperCard(
                 key: _cardKey,
                 paper: widget.paper,
+                customQuote: widget.highlightText,
                 backgroundColor: _bgColor,
                 textColor: _textColor,
               ),

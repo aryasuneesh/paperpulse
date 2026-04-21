@@ -30,6 +30,9 @@ class PaperDetailModal extends ConsumerWidget {
     WidgetRef ref, {
     required bool useHtml,
   }) async {
+    // Capture root navigator before any async gap — context may be unmounted
+    // after await, but the root navigator reference stays valid.
+    final rootNav = Navigator.of(context, rootNavigator: true);
     ref.read(bookmarkProvider.notifier).markAsInProgress(paper);
     final didIncrement =
         await ref.read(streakProvider.notifier).markActivity();
@@ -38,9 +41,8 @@ class PaperDetailModal extends ConsumerWidget {
       await StreakPopup.show(context, ref.read(streakProvider));
       if (!context.mounted) return;
     }
-    Navigator.pop(context); // close modal
-    Navigator.push(
-      context,
+    Navigator.pop(context); // close modal (branch navigator)
+    rootNav.push(
       MaterialPageRoute(
         builder: (_) => useHtml
             ? HtmlReaderScreen(paper: paper)
@@ -144,51 +146,6 @@ class PaperDetailModal extends ConsumerWidget {
                 }).toList(),
               ),
 
-              const SizedBox(height: 48),
-
-              // Bottom CTA — two buttons for ArXiv, one for others
-              if (isArxiv)
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () =>
-                            _openReader(context, ref, useHtml: false),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          side: const BorderSide(color: AppColors.midGray),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Open PDF'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () =>
-                            _openReader(context, ref, useHtml: true),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                        ),
-                        child: const Text('Open HTML'),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                ElevatedButton(
-                  onPressed: () =>
-                      _openReader(context, ref, useHtml: false),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                  ),
-                  child: const Text(
-                    'Read Full Paper →',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
             ],
           ),
         );

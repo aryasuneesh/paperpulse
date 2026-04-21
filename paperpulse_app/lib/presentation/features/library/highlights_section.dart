@@ -5,6 +5,7 @@ import '../../../data/providers/papers_provider.dart';
 import '../../../data/models/highlight.dart';
 import '../digest/html_reader_screen.dart';
 import '../digest/pdf_reader_screen.dart';
+import '../digest/share_card_sheet.dart';
 import 'providers/highlight_provider.dart';
 
 class HighlightsSection extends ConsumerWidget {
@@ -59,11 +60,21 @@ class HighlightsSection extends ConsumerWidget {
             return _HighlightItem(
               highlight: h,
               paperTitle: paper?.title ?? h.paperId,
+              onShare: paper == null
+                  ? null
+                  : () => ShareCardSheet.show(
+                        context,
+                        paper,
+                        highlightText: h.textContent,
+                      ),
               onTap: () {
                 if (paper == null) return;
+                // Push on root navigator so the IndexedStack shell is fully
+                // hidden — prevents SfPdfViewer layout errors on other branches.
+                final rootNav =
+                    Navigator.of(context, rootNavigator: true);
                 if (h.readerType == 'html') {
-                  Navigator.push(
-                    context,
+                  rootNav.push(
                     MaterialPageRoute(
                       builder: (_) => HtmlReaderScreen(
                         paper: paper,
@@ -72,8 +83,7 @@ class HighlightsSection extends ConsumerWidget {
                     ),
                   );
                 } else {
-                  Navigator.push(
-                    context,
+                  rootNav.push(
                     MaterialPageRoute(
                       builder: (_) => PdfReaderScreen(
                         paper: paper,
@@ -101,12 +111,14 @@ class _HighlightItem extends StatelessWidget {
     required this.paperTitle,
     required this.onTap,
     required this.onDelete,
+    this.onShare,
   });
 
   final Highlight highlight;
   final String paperTitle;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +164,8 @@ class _HighlightItem extends StatelessWidget {
                     highlight.textContent,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: AppColors.inkBlack),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -165,6 +178,15 @@ class _HighlightItem extends StatelessWidget {
                 ],
               ),
             ),
+            if (onShare != null)
+              IconButton(
+                icon: const Icon(Icons.ios_share, size: 18),
+                color: AppColors.midGray,
+                onPressed: onShare,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.close, size: 18),
               color: AppColors.midGray,

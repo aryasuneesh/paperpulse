@@ -37,6 +37,7 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
   String? _selectedText;
   File? _localPdfFile;
   bool _isLoadingPdf = true;
+  bool _frameReady = false;
 
   int _currentPage = 1;
   int _totalPages = 0;
@@ -47,6 +48,9 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
   void initState() {
     super.initState();
     _initLocalFile();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _frameReady = true);
+    });
   }
 
   @override
@@ -187,7 +191,11 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
             ? const Center(
                 child: CircularProgressIndicator(color: AppColors.sageGreen),
               )
-            : Stack(
+            : !_frameReady
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.sageGreen),
+                  )
+                : Stack(
                 children: [
                   _buildViewer(),
                   // Page number indicator

@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/providers/user_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -27,10 +27,9 @@ class HtmlReaderScreen extends ConsumerStatefulWidget {
 }
 
 class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
-  InAppWebViewController? _controller;
+  late final WebViewController _controller;
   int _fontSize = 16;
   SharedPreferences? _prefs;
-
   String? _pendingSelection;
   String? _pendingSentence;
 
@@ -47,10 +46,45 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     '#457B9D',
   ];
 
+  String get _htmlUrl {
+    final url = widget.paper.sourceUrl;
+    final html = url.replaceAllMapped(
+      RegExp(r'pdf/(.*)\.pdf$'),
+      (m) => 'html/${m[1]}',
+    );
+    assert(html != url, 'HtmlReaderScreen opened with non-ArXiv URL: $url');
+    return html;
+  }
+
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) => _onPageLoaded(),
+      ))
+      ..addJavaScriptChannel(
+        'SelectionHandler',
+        onMessageReceived: (msg) {
+          try {
+            final data = jsonDecode(msg.message) as Map<String, dynamic>;
+            final text = data['text'] as String? ?? '';
+            final sentence = data['sentence'] as String? ?? text;
+            // Empty text means the user deselected — clear pending state.
+            if (text.trim().isNotEmpty) {
+              _pendingSelection = text;
+              _pendingSentence = sentence;
+            } else {
+              _pendingSelection = null;
+              _pendingSentence = null;
+            }
+            if (mounted) setState(() {});
+          } catch (_) {}
+        },
+      )
+      ..loadRequest(Uri.parse(_htmlUrl));
   }
 
   @override
@@ -67,22 +101,29 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     });
   }
 
-  String get _htmlUrl {
-    final url = widget.paper.sourceUrl;
-    final html = url.replaceAllMapped(
-      RegExp(r'pdf/(.*)\.pdf$'),
-      (m) => 'html/${m[1]}',
-    );
-    assert(html != url, 'HtmlReaderScreen opened with non-ArXiv URL: $url');
-    return html;
-  }
-
   Future<void> _applyFontSize() async {
-    await _controller?.evaluateJavascript(
-      source:
-          "document.body.style.fontSize='${_fontSize}px';"
-          "document.body.style.lineHeight='1.6';",
-    );
+    // setProperty with 'important' sets an inline !important — the single
+    // highest-priority slot in CSS, beating any author or external stylesheet.
+    await _controller.runJavaScript('''
+(function() {
+  var size = '${_fontSize}px';
+  var body = document.body;
+  if (!body) return;
+  body.style.setProperty('font-size', size, 'important');
+  body.style.setProperty('line-height', '1.6', 'important');
+  var textSels = 'p,li,td,th,dt,dd,figcaption,blockquote,.ltx_p,.ltx_para,.ltx_text,.ltx_item';
+  document.querySelectorAll(textSels).forEach(function(el) {
+    el.style.setProperty('font-size', size, 'important');
+    el.style.setProperty('line-height', '1.6', 'important');
+  });
+  var headings = [['h1,.ltx_title', 1.8], ['h2', 1.5], ['h3', 1.3], ['h4,h5,h6', 1.1]];
+  headings.forEach(function(pair) {
+    document.querySelectorAll(pair[0]).forEach(function(el) {
+      el.style.setProperty('font-size', (${_fontSize} * pair[1]) + 'px', 'important');
+    });
+  });
+})();
+''');
   }
 
   void _changeFontSize(int delta) {
@@ -93,27 +134,47 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     _applyFontSize();
   }
 
+  Future<void> _clearSelection() async {
+    await _controller.runJavaScript(
+      'window.getSelection().removeAllRanges(); window._ppRange = null;',
+    );
+    if (mounted) {
+      setState(() {
+        _pendingSelection = null;
+        _pendingSentence = null;
+      });
+    }
+  }
+
   Future<void> _onPageLoaded() async {
     if (!mounted) return;
     await _applyFontSize();
     if (!mounted) return;
 
-    await _controller?.evaluateJavascript(source: '''
+    // Selection listener: store the live Range object so applyHighlight can use
+    // it directly — avoids the fragile text-search-in-DOM round-trip.
+    await _controller.runJavaScript('''
 (function() {
   var _selTimer;
   document.addEventListener('selectionchange', function() {
     clearTimeout(_selTimer);
     _selTimer = setTimeout(function() {
-      const sel = window.getSelection();
-      const text = sel ? sel.toString().trim() : '';
-      if (text.length > 0) {
-        let sentence = text;
+      var sel = window.getSelection();
+      var text = sel ? sel.toString().trim() : '';
+      if (text.length === 0) {
+        window._ppRange = null;
+        window.SelectionHandler.postMessage(JSON.stringify({text: '', sentence: ''}));
+      } else if (text.length <= 500) {
         try {
-          const range = sel.getRangeAt(0);
-          const node = range.startContainer;
+          var range = sel.getRangeAt(0);
+          window._ppRange = range.cloneRange();
+        } catch(e) { window._ppRange = null; }
+        var sentence = text;
+        try {
+          var node = sel.getRangeAt(0).startContainer;
           sentence = (node.textContent || text).trim().substring(0, 500);
         } catch(e) {}
-        window.flutter_inappwebview.callHandler('SelectionHandler', {text: text, sentence: sentence});
+        window.SelectionHandler.postMessage(JSON.stringify({text: text, sentence: sentence}));
       }
     }, 300);
   });
@@ -122,23 +183,36 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
 
     if (!mounted) return;
 
-    await _controller?.evaluateJavascript(source: '''
-function highlightText(text, color) {
-  if (!text) return;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while (node = walker.nextNode()) {
-    const idx = node.nodeValue.indexOf(text);
-    if (idx >= 0) {
-      const mark = document.createElement('mark');
-      mark.style.background = color;
-      mark.style.color = 'inherit';
-      const after = node.splitText(idx);
-      after.splitText(text.length);
-      const clone = after.cloneNode(true);
-      mark.appendChild(clone);
-      after.parentNode.replaceChild(mark, after);
-      break;
+    // applyHighlight: wraps the stored Range in a coloured span.
+    // restoreHighlight: uses window.find() to locate saved text, then wraps it.
+    await _controller.runJavaScript('''
+function _ppWrapRange(range, color) {
+  var span = document.createElement('span');
+  span.setAttribute('style',
+    'background:' + color + ' !important;' +
+    'border-radius:2px;padding:0 1px;display:inline;');
+  try {
+    range.surroundContents(span);
+  } catch(e) {
+    var frag = range.extractContents();
+    span.appendChild(frag);
+    range.insertNode(span);
+  }
+}
+function applyHighlight(color) {
+  var range = window._ppRange;
+  if (!range) return;
+  _ppWrapRange(range, color);
+  window._ppRange = null;
+  window.getSelection().removeAllRanges();
+}
+function restoreHighlight(text, color) {
+  if (!text || !window.find) return;
+  if (window.find(text, false, false, false, false, false, false)) {
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      _ppWrapRange(sel.getRangeAt(0), color);
+      sel.removeAllRanges();
     }
   }
 }
@@ -150,10 +224,10 @@ function highlightText(text, color) {
           (h) => h.paperId == widget.paper.id && h.readerType == 'html',
         );
     for (final h in highlights) {
-      final color = _hexToRgba(h.color, 0.4);
+      final color = _hexToRgba(h.color, 0.6);
       if (color == null) continue;
-      await _controller?.evaluateJavascript(
-        source: "highlightText(${jsonEncode(h.textContent)}, ${jsonEncode(color)});",
+      await _controller.runJavaScript(
+        "restoreHighlight(${jsonEncode(h.textContent)}, ${jsonEncode(color)});",
       );
       if (!mounted) return;
     }
@@ -161,7 +235,7 @@ function highlightText(text, color) {
     if (!mounted) return;
 
     if (widget.initialSearchText != null) {
-      await _controller?.evaluateJavascript(source: '''
+      await _controller.runJavaScript('''
 (function() {
   const target = ${jsonEncode(widget.initialSearchText)};
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
@@ -272,10 +346,10 @@ function highlightText(text, color) {
     );
     ref.read(highlightProvider.notifier).addHighlight(h);
 
-    final rgba = _hexToRgba(selectedHexColor, 0.4);
+    final rgba = _hexToRgba(selectedHexColor, 0.6);
     if (rgba != null) {
-      await _controller?.evaluateJavascript(
-        source: "highlightText(${jsonEncode(selection)}, ${jsonEncode(rgba)});",
+      await _controller.runJavaScript(
+        "applyHighlight(${jsonEncode(rgba)});",
       );
     }
 
@@ -313,6 +387,7 @@ function highlightText(text, color) {
         actions: [
           IconButton(
             icon: const Icon(Icons.text_decrease),
+            color: AppColors.inkBlack,
             tooltip: 'Decrease font size',
             onPressed: _fontSize > _minFontSize
                 ? () => _changeFontSize(-_fontSizeStep)
@@ -320,53 +395,44 @@ function highlightText(text, color) {
           ),
           IconButton(
             icon: const Icon(Icons.text_increase),
+            color: AppColors.inkBlack,
             tooltip: 'Increase font size',
             onPressed: _fontSize < _maxFontSize
                 ? () => _changeFontSize(_fontSizeStep)
                 : null,
           ),
-          Opacity(
-            opacity: _pendingSelection != null ? 1.0 : 0.35,
-            child: IconButton(
-              icon: const Icon(Icons.highlight),
-              tooltip: 'Highlight selected text',
-              onPressed: _pendingSelection != null
-                  ? () => _showColorPicker(context)
-                  : null,
+          if (_pendingSelection != null)
+            IconButton(
+              icon: const Icon(Icons.highlight_off),
+              color: AppColors.midGray,
+              tooltip: 'Clear selection',
+              onPressed: _clearSelection,
             ),
+          IconButton(
+            icon: Icon(
+              Icons.highlight,
+              color: _pendingSelection != null
+                  ? AppColors.sageDark
+                  : AppColors.inkBlack,
+            ),
+            tooltip: 'Highlight selected text',
+            onPressed: () {
+              if (_pendingSelection != null) {
+                _showColorPicker(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Select some text first'),
+                    duration: Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
           ),
         ],
       ),
-      body: InAppWebView(
-        initialUrlRequest: URLRequest(url: WebUri(_htmlUrl)),
-        initialSettings: InAppWebViewSettings(
-          javaScriptEnabled: true,
-          supportZoom: true,
-          useWideViewPort: true,
-          loadWithOverviewMode: true,
-        ),
-        onWebViewCreated: (controller) {
-          _controller = controller;
-          controller.addJavaScriptHandler(
-            handlerName: 'SelectionHandler',
-            callback: (args) {
-              if (args.isNotEmpty) {
-                final data = args.first as Map<String, dynamic>;
-                final text = data['text'] as String? ?? '';
-                final sentence = data['sentence'] as String? ?? text;
-                if (text.trim().isNotEmpty) {
-                  _pendingSelection = text;
-                  _pendingSentence = sentence;
-                  if (mounted) setState(() {});
-                }
-              }
-            },
-          );
-        },
-        onLoadStop: (controller, url) async {
-          await _onPageLoaded();
-        },
-      ),
+      body: WebViewWidget(controller: _controller),
     );
   }
 }
