@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/lab_pref.dart';
+import '../../services/lab_notification_service.dart';
 
 const _storageKey = 'lab_prefs_v1';
 
@@ -51,6 +52,16 @@ class LabPrefsNotifier extends AsyncNotifier<Map<String, LabPref>> {
       favourited: value ? existing.favourited : false,
     );
     await _save(updated);
+    try {
+      final anyFav = updated.values.any((p) => p.favourited);
+      if (anyFav) {
+        await ensureDailyTaskRegistered();
+      } else {
+        await cancelDailyTask();
+      }
+    } catch (_) {
+      // Workmanager not initialised (test / headless) — safe to ignore.
+    }
   }
 
   Future<void> setFavourited(String labId, bool value) async {
@@ -62,6 +73,16 @@ class LabPrefsNotifier extends AsyncNotifier<Map<String, LabPref>> {
       displayed: value ? true : existing.displayed,
     );
     await _save(updated);
+    try {
+      final anyFav = updated.values.any((p) => p.favourited);
+      if (anyFav) {
+        await ensureDailyTaskRegistered();
+      } else {
+        await cancelDailyTask();
+      }
+    } catch (_) {
+      // Workmanager not initialised (test / headless) — safe to ignore.
+    }
   }
 
   Future<void> _save(Map<String, LabPref> next) async {

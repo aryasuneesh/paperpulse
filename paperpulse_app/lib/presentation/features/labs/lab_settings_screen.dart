@@ -6,6 +6,7 @@ import '../../../data/models/lab.dart';
 import '../../../data/models/lab_pref.dart';
 import '../../../data/providers/lab_catalog_provider.dart';
 import '../../../data/providers/lab_prefs_provider.dart';
+import '../../../services/lab_notification_service.dart';
 
 class LabSettingsScreen extends ConsumerWidget {
   const LabSettingsScreen({super.key});
@@ -104,9 +105,15 @@ class _LabRow extends StatelessWidget {
               pref.favourited ? Icons.star : Icons.star_border,
               color: pref.favourited ? AppColors.sageDark : AppColors.midGray,
             ),
-            onPressed: () => ref
-                .read(labPrefsProvider.notifier)
-                .setFavourited(lab.id, !pref.favourited),
+            onPressed: () async {
+              final willBeFavourited = !pref.favourited;
+              await ref
+                  .read(labPrefsProvider.notifier)
+                  .setFavourited(lab.id, willBeFavourited);
+              if (willBeFavourited) {
+                await requestNotificationPermission();
+              }
+            },
           ),
           const SizedBox(width: 4),
           Switch(

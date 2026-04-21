@@ -6,10 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/routing/app_router.dart';
+import 'services/lab_notification_service.dart';
 
 late SharedPreferences sharedPrefs;
 
@@ -25,6 +27,12 @@ Future<void> main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
+  );
+
+  await initNotificationsPlugin();
+  await Workmanager().initialize(
+    labBackgroundCallback,
+    isInDebugMode: false,
   );
 
   runApp(const ProviderScope(child: PaperPulseApp()));

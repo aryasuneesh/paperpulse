@@ -138,3 +138,17 @@ Future<void> runLabDailyCheck() async {
       : updated;
   await prefs.setStringList(_lastSeenKey, capped);
 }
+
+Future<void> ensureDailyTaskRegistered() async {
+  await Workmanager().registerPeriodicTask(
+    labDailyTaskName,
+    labDailyTaskName,
+    frequency: const Duration(hours: 24),
+    constraints: Constraints(networkType: NetworkType.connected),
+    existingWorkPolicy: ExistingWorkPolicy.keep,
+  );
+}
+
+Future<void> cancelDailyTask() async {
+  await Workmanager().cancelByUniqueName(labDailyTaskName);
+}
