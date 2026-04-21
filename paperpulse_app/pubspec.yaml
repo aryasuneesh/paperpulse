@@ -39,6 +39,7 @@ flutter:
 
   assets:
     - assets/lottie/
+    - assets/config/
 
   fonts:
     - family: DreamOrphans

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "labs": [
+    { "id": "deepmind",   "displayName": "Google DeepMind",         "avatarUrl": null, "aliases": ["google-deepmind", "deepmind", "google deepmind"] },
+    { "id": "google",     "displayName": "Google",                  "avatarUrl": null, "aliases": ["google", "google-research", "google research"] },
+    { "id": "meta-fair",  "displayName": "Meta (FAIR)",             "avatarUrl": null, "aliases": ["meta-fair", "facebookai", "facebook-ai", "meta", "facebook"] },
+    { "id": "anthropic",  "displayName": "Anthropic",               "avatarUrl": null, "aliases": ["anthropic", "anthropiccommunity"] },
+    { "id": "openai",     "displayName": "OpenAI",                  "avatarUrl": null, "aliases": ["openai"] },
+    { "id": "microsoft",  "displayName": "Microsoft Research",      "avatarUrl": null, "aliases": ["microsoft", "microsoft-research", "msr"] },
+    { "id": "apple",      "displayName": "Apple",                   "avatarUrl": null, "aliases": ["apple", "apple-ml"] },
+    { "id": "nvidia",     "displayName": "Nvidia",                  "avatarUrl": null, "aliases": ["nvidia", "nvidia-research"] },
+    { "id": "cohere",     "displayName": "Cohere",                  "avatarUrl": null, "aliases": ["cohere", "coherelabs", "cohere-labs", "cohereforai"] },
+    { "id": "mistral",    "displayName": "Mistral AI",              "avatarUrl": null, "aliases": ["mistralai", "mistral-ai", "mistral"] },
+    { "id": "deepseek",   "displayName": "DeepSeek",                "avatarUrl": null, "aliases": ["deepseek-ai", "deepseek"] },
+    { "id": "qwen",       "displayName": "Qwen / Alibaba",          "avatarUrl": null, "aliases": ["qwen", "alibaba", "alibaba-nlp"] },
+    { "id": "allenai",    "displayName": "Allen AI",                "avatarUrl": null, "aliases": ["allenai", "allen-ai", "ai2"] },
+    { "id": "stability",  "displayName": "Stability AI",            "avatarUrl": null, "aliases": ["stability-ai", "stabilityai", "stability"] },
+    { "id": "bytedance",  "displayName": "ByteDance",               "avatarUrl": null, "aliases": ["bytedance", "bytedance-research"] },
+    { "id": "salesforce", "displayName": "Salesforce AI Research",  "avatarUrl": null, "aliases": ["salesforce", "salesforce-ai", "salesforceairesearch"] }
+  ]
+}
