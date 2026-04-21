@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/lab.dart';
 import '../../../data/models/paper.dart';
 import '../../../data/providers/lab_catalog_provider.dart';
+import '../../../data/providers/lab_prefs_provider.dart';
 import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
 import '../digest/paper_detail_modal.dart';
@@ -58,13 +59,16 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   }
 
   /// Labs that have at least one paper in today's feed.
-  List<Lab> _visibleLabs(List<Paper> papers, List<Lab> labs) {
+  List<Lab> _visibleLabs(
+      List<Paper> papers, List<Lab> labs, Set<String> displayedIds) {
     final present = <String>{};
     for (final p in papers) {
       final id = resolveLabId(p.organization, labs);
       if (id != null) present.add(id);
     }
-    return labs.where((l) => present.contains(l.id)).toList(growable: false);
+    return labs
+        .where((l) => present.contains(l.id) && displayedIds.contains(l.id))
+        .toList(growable: false);
   }
 
   @override
@@ -72,6 +76,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     final theme = Theme.of(context);
     final papersAsync = ref.watch(papersProvider);
     final labsAsync = ref.watch(labCatalogProvider);
+    final prefsAsync = ref.watch(labPrefsProvider);
+    final prefsMap = prefsAsync.asData?.value;
+    final displayedIds = prefsMap == null
+        ? <String>{}
+        : prefsMap.entries
+            .where((e) => e.value.displayed)
+            .map((e) => e.key)
+            .toSet();
 
     return Scaffold(
       body: SafeArea(
@@ -162,6 +174,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               selectedLabId: _selectedLabId,
               onSelect: (id) => setState(() => _selectedLabId = id),
               visibleLabsFn: _visibleLabs,
+              displayedIds: displayedIds,
             ),
 
             const SizedBox(height: 16),
@@ -246,13 +259,15 @@ class _LabChipRow extends StatelessWidget {
     required this.selectedLabId,
     required this.onSelect,
     required this.visibleLabsFn,
+    required this.displayedIds,
   });
 
   final AsyncValue<List<Paper>> papersAsync;
   final AsyncValue<List<Lab>> labsAsync;
   final String selectedLabId;
   final ValueChanged<String> onSelect;
-  final List<Lab> Function(List<Paper>, List<Lab>) visibleLabsFn;
+  final List<Lab> Function(List<Paper>, List<Lab>, Set<String>) visibleLabsFn;
+  final Set<String> displayedIds;
 
   @override
   Widget build(BuildContext context) {
@@ -263,7 +278,7 @@ class _LabChipRow extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final visible = visibleLabsFn(papers, labs);
+    final visible = visibleLabsFn(papers, labs, displayedIds);
     if (visible.isEmpty) return const SizedBox.shrink();
 
     final entries = <_LabChipEntry>[
