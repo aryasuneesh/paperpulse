@@ -10,6 +10,7 @@ import '../features/onboarding/hero_screen.dart';
 import '../features/onboarding/interest_picker_screen.dart';
 import '../features/onboarding/sample_cards_screen.dart';
 import '../features/onboarding/splash_screen.dart';
+import '../features/labs/lab_settings_screen.dart';
 import '../features/profile/profile_screen.dart';
 import 'scaffold_with_nav_bar.dart';
 
@@ -51,6 +52,11 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/onboarding/account',
       builder: (context, state) => const AccountCreationScreen(),
+    ),
+    GoRoute(
+      path: '/labs',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const LabSettingsScreen(),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {

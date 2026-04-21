@@ -163,6 +163,8 @@ class ProfileScreen extends ConsumerWidget {
                   onTap: () => _showScheduleModal(context, theme)),
               _tile('Interest Topics', Icons.tag, theme,
                   onTap: () => context.push('/onboarding/interests?from=profile')),
+              _tile('Manage Labs', Icons.science_outlined, theme,
+                  onTap: () => context.push('/labs')),
               _tile('Notifications', Icons.notifications_outlined, theme,
                   onTap: () => _showNotificationsSheet(context, theme)),
               _tile('Account', Icons.person_outline, theme,
