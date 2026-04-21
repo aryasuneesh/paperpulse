@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/paper.dart';
+import '../models/paper_organization.dart';
 
 final paperRepositoryProvider = Provider((ref) => PaperRepository());
 
@@ -59,6 +60,12 @@ class PaperRepository {
         topics = _inferTopics(title, summary);
       }
 
+      PaperOrganization? organization;
+      final orgNode = entry['organization'];
+      if (orgNode is Map<String, dynamic>) {
+        organization = PaperOrganization.fromJson(orgNode);
+      }
+
       return Paper(
         id: id,
         title: title,
@@ -69,6 +76,7 @@ class PaperRepository {
         topicTags: topics,
         curiosityHook: summary.isNotEmpty ? summary : 'No summary available.',
         citationCount: 0,
+        organization: organization,
       );
     } catch (_) {
       return null;

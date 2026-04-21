@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -43,6 +44,55 @@ void main() {
       final errorClient = MockClient((_) async => http.Response('error', 500));
       final repo = PaperRepository(client: errorClient);
       expect(() => repo.fetchDailyPapers(), throwsA(isA<Exception>()));
+    });
+  });
+
+  group('organization parsing', () {
+    test('parses top-level organization when present', () async {
+      final mockClient = MockClient((req) async {
+        return http.Response(jsonEncode([
+          {
+            'paper': {
+              'id': '2604.17849',
+              'title': 'T',
+              'authors': [{'name': 'A'}],
+              'publishedAt': '2026-04-20T00:00:00.000Z',
+              'arxiv_categories': ['cs.LG'],
+              'summary': 's',
+            },
+            'organization': {
+              '_id': 'o1',
+              'name': 'simular-ai',
+              'fullname': 'Simular',
+              'avatar': 'https://a/b.png',
+            },
+          }
+        ]), 200);
+      });
+      final repo = PaperRepository(client: mockClient);
+      final papers = await repo.fetchDailyPapers();
+      expect(papers, hasLength(1));
+      expect(papers.first.organization, isNotNull);
+      expect(papers.first.organization!.name, 'simular-ai');
+      expect(papers.first.organization!.fullname, 'Simular');
+    });
+
+    test('tolerates missing organization field', () async {
+      final mockClient = MockClient((req) async {
+        return http.Response(jsonEncode([
+          {
+            'paper': {
+              'id': '2604.17850',
+              'title': 'T',
+              'authors': [{'name': 'A'}],
+              'publishedAt': '2026-04-20T00:00:00.000Z',
+            }
+          }
+        ]), 200);
+      });
+      final repo = PaperRepository(client: mockClient);
+      final papers = await repo.fetchDailyPapers();
+      expect(papers.first.organization, isNull);
     });
   });
 }
