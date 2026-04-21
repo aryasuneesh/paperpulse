@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/lab.dart';
 import '../../../data/models/paper.dart';
+import '../../../data/providers/lab_catalog_provider.dart';
 import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
 import '../digest/paper_detail_modal.dart';
 
-// These match the actual topics inferred from HuggingFace Daily Papers (ML/AI domain)
 const _browseTopics = [
   'All',
   'Machine Learning',
@@ -20,6 +21,8 @@ const _browseTopics = [
   'AI Safety',
 ];
 
+const _allLabId = '__all__';
+
 class BrowseScreen extends ConsumerStatefulWidget {
   const BrowseScreen({super.key});
 
@@ -29,13 +32,17 @@ class BrowseScreen extends ConsumerStatefulWidget {
 
 class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   String _selectedTopic = 'All';
+  String _selectedLabId = _allLabId;
   String _searchQuery = '';
 
-  List<Paper> _filter(List<Paper> papers) {
+  List<Paper> _filter(List<Paper> papers, List<Lab> labs) {
     var list = papers;
     if (_selectedTopic != 'All') {
+      list = list.where((p) => p.topicTags.contains(_selectedTopic)).toList();
+    }
+    if (_selectedLabId != _allLabId) {
       list = list
-          .where((p) => p.topicTags.contains(_selectedTopic))
+          .where((p) => resolveLabId(p.organization, labs) == _selectedLabId)
           .toList();
     }
     if (_searchQuery.isNotEmpty) {
@@ -50,10 +57,21 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     return list;
   }
 
+  /// Labs that have at least one paper in today's feed.
+  List<Lab> _visibleLabs(List<Paper> papers, List<Lab> labs) {
+    final present = <String>{};
+    for (final p in papers) {
+      final id = resolveLabId(p.organization, labs);
+      if (id != null) present.add(id);
+    }
+    return labs.where((l) => present.contains(l.id)).toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final papersAsync = ref.watch(papersProvider);
+    final labsAsync = ref.watch(labCatalogProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -65,7 +83,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               child: Text('Browse', style: theme.textTheme.headlineLarge),
             ),
 
-            // Search Bar
+            // Search bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
@@ -98,7 +116,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
             const SizedBox(height: 16),
 
-            // Filter Chips
+            // Topic chips
             SizedBox(
               height: 40,
               child: ListView.builder(
@@ -137,19 +155,34 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               ),
             ),
 
+            // Lab chips (only when catalog loaded AND today's feed has matches)
+            _LabChipRow(
+              papersAsync: papersAsync,
+              labsAsync: labsAsync,
+              selectedLabId: _selectedLabId,
+              onSelect: (id) => setState(() => _selectedLabId = id),
+              visibleLabsFn: _visibleLabs,
+            ),
+
             const SizedBox(height: 16),
 
-            Expanded(child: _buildFeed(theme, papersAsync)),
+            Expanded(
+              child: _buildFeed(theme, papersAsync, labsAsync),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeed(ThemeData theme, AsyncValue<List<Paper>> papersAsync) {
+  Widget _buildFeed(
+    ThemeData theme,
+    AsyncValue<List<Paper>> papersAsync,
+    AsyncValue<List<Lab>> labsAsync,
+  ) {
     return papersAsync.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator(color: AppColors.sageGreen)),
+      loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.sageGreen)),
       error: (err, _) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -170,13 +203,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         ),
       ),
       data: (all) {
-        final papers = _filter(all);
+        final labs = labsAsync.asData?.value ?? const <Lab>[];
+        final papers = _filter(all, labs);
         if (papers.isEmpty) {
           return Center(
             child: Text(
-              _selectedTopic == 'All'
+              _selectedTopic == 'All' && _selectedLabId == _allLabId
                   ? 'No papers available.'
-                  : 'No papers found for "$_selectedTopic".',
+                  : 'No papers match the current filters.',
               style:
                   theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
               textAlign: TextAlign.center,
@@ -194,7 +228,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (context) => PaperDetailModal(paper: papers[index]),
+                builder: (context) =>
+                    PaperDetailModal(paper: papers[index]),
               );
             },
           ),
@@ -202,4 +237,104 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
       },
     );
   }
+}
+
+class _LabChipRow extends StatelessWidget {
+  const _LabChipRow({
+    required this.papersAsync,
+    required this.labsAsync,
+    required this.selectedLabId,
+    required this.onSelect,
+    required this.visibleLabsFn,
+  });
+
+  final AsyncValue<List<Paper>> papersAsync;
+  final AsyncValue<List<Lab>> labsAsync;
+  final String selectedLabId;
+  final ValueChanged<String> onSelect;
+  final List<Lab> Function(List<Paper>, List<Lab>) visibleLabsFn;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final papers = papersAsync.asData?.value;
+    final labs = labsAsync.asData?.value;
+    if (papers == null || labs == null) {
+      return const SizedBox.shrink();
+    }
+
+    final visible = visibleLabsFn(papers, labs);
+    if (visible.isEmpty) return const SizedBox.shrink();
+
+    final entries = <_LabChipEntry>[
+      _LabChipEntry(id: _allLabId, label: 'All Labs', avatar: null),
+      ...visible.map((l) => _LabChipEntry(
+            id: l.id,
+            label: l.displayName,
+            avatar: l.avatarUrl ?? _pickPaperAvatar(papers, l.id),
+          )),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: SizedBox(
+        height: 40,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            final e = entries[index];
+            final isSelected = selectedLabId == e.id;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                avatar: e.avatar != null
+                    ? CircleAvatar(
+                        backgroundImage: NetworkImage(e.avatar!),
+                        radius: 10,
+                      )
+                    : null,
+                label: Text(e.label),
+                selected: isSelected,
+                onSelected: (_) => onSelect(e.id),
+                labelStyle: theme.textTheme.labelMedium?.copyWith(
+                  color: isSelected
+                      ? AppColors.paperWhite
+                      : AppColors.sageDark,
+                ),
+                backgroundColor: AppColors.sageLight,
+                selectedColor: AppColors.inkBlack,
+                side: BorderSide(
+                  color: isSelected
+                      ? AppColors.inkBlack
+                      : AppColors.sageGreen,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                showCheckmark: false,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  static String? _pickPaperAvatar(List<Paper> papers, String labId) {
+    for (final p in papers) {
+      if (p.organization?.avatarUrl != null) {
+        return p.organization!.avatarUrl;
+      }
+    }
+    return null;
+  }
+}
+
+class _LabChipEntry {
+  final String id;
+  final String label;
+  final String? avatar;
+  _LabChipEntry({required this.id, required this.label, this.avatar});
 }
