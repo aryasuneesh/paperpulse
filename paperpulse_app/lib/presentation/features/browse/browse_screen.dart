@@ -58,16 +58,17 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     return list;
   }
 
-  /// Labs that have at least one paper in today's feed.
+  /// Labs that have at least one paper in today's feed and aren't explicitly
+  /// hidden. Labs absent from prefs are shown by default.
   List<Lab> _visibleLabs(
-      List<Paper> papers, List<Lab> labs, Set<String> displayedIds) {
+      List<Paper> papers, List<Lab> labs, Set<String> hiddenIds) {
     final present = <String>{};
     for (final p in papers) {
       final id = resolveLabId(p.organization, labs);
       if (id != null) present.add(id);
     }
     return labs
-        .where((l) => present.contains(l.id) && displayedIds.contains(l.id))
+        .where((l) => present.contains(l.id) && !hiddenIds.contains(l.id))
         .toList(growable: false);
   }
 
@@ -78,10 +79,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     final labsAsync = ref.watch(labCatalogProvider);
     final prefsAsync = ref.watch(labPrefsProvider);
     final prefsMap = prefsAsync.asData?.value;
-    final displayedIds = prefsMap == null
+    final hiddenIds = prefsMap == null
         ? <String>{}
         : prefsMap.entries
-            .where((e) => e.value.displayed)
+            .where((e) => !e.value.displayed)
             .map((e) => e.key)
             .toSet();
 
@@ -174,7 +175,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               selectedLabId: _selectedLabId,
               onSelect: (id) => setState(() => _selectedLabId = id),
               visibleLabsFn: _visibleLabs,
-              displayedIds: displayedIds,
+              hiddenIds: hiddenIds,
             ),
 
             const SizedBox(height: 16),
@@ -259,7 +260,7 @@ class _LabChipRow extends StatelessWidget {
     required this.selectedLabId,
     required this.onSelect,
     required this.visibleLabsFn,
-    required this.displayedIds,
+    required this.hiddenIds,
   });
 
   final AsyncValue<List<Paper>> papersAsync;
@@ -267,7 +268,7 @@ class _LabChipRow extends StatelessWidget {
   final String selectedLabId;
   final ValueChanged<String> onSelect;
   final List<Lab> Function(List<Paper>, List<Lab>, Set<String>) visibleLabsFn;
-  final Set<String> displayedIds;
+  final Set<String> hiddenIds;
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +279,7 @@ class _LabChipRow extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final visible = visibleLabsFn(papers, labs, displayedIds);
+    final visible = visibleLabsFn(papers, labs, hiddenIds);
     if (visible.isEmpty) return const SizedBox.shrink();
 
     final entries = <_LabChipEntry>[
@@ -286,7 +287,7 @@ class _LabChipRow extends StatelessWidget {
       ...visible.map((l) => _LabChipEntry(
             id: l.id,
             label: l.displayName,
-            avatar: l.avatarUrl ?? _pickPaperAvatar(papers, l.id),
+            avatar: l.avatarUrl ?? _pickPaperAvatar(papers, labs, l.id),
           )),
     ];
 
@@ -337,9 +338,11 @@ class _LabChipRow extends StatelessWidget {
     );
   }
 
-  static String? _pickPaperAvatar(List<Paper> papers, String labId) {
+  static String? _pickPaperAvatar(
+      List<Paper> papers, List<Lab> labs, String labId) {
     for (final p in papers) {
-      if (p.organization?.avatarUrl != null) {
+      if (p.organization?.avatarUrl == null) continue;
+      if (resolveLabId(p.organization, labs) == labId) {
         return p.organization!.avatarUrl;
       }
     }

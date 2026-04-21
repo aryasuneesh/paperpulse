@@ -27,14 +27,16 @@ class LabPrefsNotifier extends AsyncNotifier<Map<String, LabPref>> {
   }
 
   bool isDisplayed(String labId) =>
-      state.asData?.value[labId]?.displayed ?? false;
+      state.asData?.value[labId]?.displayed ?? true;
   bool isFavourited(String labId) =>
       state.asData?.value[labId]?.favourited ?? false;
 
-  Iterable<String> get displayedIds =>
+  /// Lab ids explicitly hidden by the user. Labs absent from the map default
+  /// to displayed=true, so the canonical filter is "not in hiddenIds".
+  Iterable<String> get hiddenIds =>
       (state.asData?.value ?? const <String, LabPref>{})
           .entries
-          .where((e) => e.value.displayed)
+          .where((e) => !e.value.displayed)
           .map((e) => e.key);
 
   Iterable<String> get favouritedIds =>

@@ -17,9 +17,9 @@ void main() {
     return container.read(labPrefsProvider.notifier);
   }
 
-  test('defaults to empty prefs (neither displayed nor favourited)', () async {
+  test('unseen labs default to displayed=true, favourited=false', () async {
     final notifier = await makeNotifier();
-    expect(notifier.isDisplayed('deepmind'), isFalse);
+    expect(notifier.isDisplayed('deepmind'), isTrue);
     expect(notifier.isFavourited('deepmind'), isFalse);
   });
 

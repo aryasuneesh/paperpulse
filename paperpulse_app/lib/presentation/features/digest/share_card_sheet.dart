@@ -70,7 +70,7 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'image/png')],
-        text: '📖 ${widget.paper.title}\n\nvia PaperPulse',
+        text: '📖 ${widget.paper.title}\n\n${widget.paper.sourceUrl}\n\nvia PaperPulse',
       );
     } catch (e) {
       if (mounted) {

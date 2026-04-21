@@ -75,6 +75,7 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
           createdAt: DateTime.now(),
           status: BookmarkStatus.unread,
           topicTags: paper.topicTags,
+          paper: paper,
         ),
       ];
     }
@@ -94,6 +95,7 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
           createdAt: DateTime.now(),
           status: BookmarkStatus.in_progress,
           topicTags: paper.topicTags,
+          paper: paper,
         ),
       ];
       _saveBookmarks(state);
@@ -111,6 +113,7 @@ class BookmarkNotifier extends Notifier<List<Bookmark>> {
             createdAt: bookmark.createdAt,
             status: newStatus,
             topicTags: bookmark.topicTags,
+            paper: bookmark.paper,
           )
         else
           bookmark,

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/bookmark.dart';
 import '../../../data/models/paper.dart';
-import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
 import '../digest/paper_detail_modal.dart';
 import 'highlights_section.dart';
@@ -99,12 +98,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   Widget _buildPaperList(BookmarkStatus status) {
     final bookmarks = ref.watch(bookmarkProvider);
-    final bookmarkedIds = bookmarks
+    final papers = bookmarks
         .where((b) => b.status == status)
-        .map((b) => b.paperId)
-        .toSet();
+        .map((b) => b.paper)
+        .toList();
 
-    if (bookmarkedIds.isEmpty) {
+    if (papers.isEmpty) {
       return _buildEmptyState(switch (status) {
         BookmarkStatus.unread =>
           'No unread papers.\nSwipe right on any card to save one!',
@@ -113,47 +112,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       });
     }
 
-    final papersAsync = ref.watch(papersProvider);
-
-    return papersAsync.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator(color: AppColors.sageGreen)),
-      error: (_, __) => _buildEmptyState('Failed to load papers.'),
-      data: (allPapers) {
-        final papers =
-            allPapers.where((p) => bookmarkedIds.contains(p.id)).toList();
-
-        if (papers.isEmpty) {
-          return _buildEmptyState('Saved papers are no longer in today\'s digest.');
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          itemCount: papers.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final paper = papers[index];
-            return _LibraryPaperItem(
-              paper: paper,
-              currentStatus: status,
-              onOpen: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => PaperDetailModal(paper: paper),
-              ),
-              onRemove: () {
-                ref.read(bookmarkProvider.notifier).toggleBookmark(paper);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Removed from Library')),
-                );
-              },
-              onStatusChange: (newStatus) {
-                ref
-                    .read(bookmarkProvider.notifier)
-                    .updateStatus(paper.id, newStatus);
-              },
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      itemCount: papers.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final paper = papers[index];
+        return _LibraryPaperItem(
+          paper: paper,
+          currentStatus: status,
+          onOpen: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => PaperDetailModal(paper: paper),
+          ),
+          onRemove: () {
+            ref.read(bookmarkProvider.notifier).toggleBookmark(paper);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Removed from Library')),
             );
+          },
+          onStatusChange: (newStatus) {
+            ref
+                .read(bookmarkProvider.notifier)
+                .updateStatus(paper.id, newStatus);
           },
         );
       },
