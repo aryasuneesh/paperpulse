@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
@@ -59,6 +60,10 @@ void labBackgroundCallback() {
   Workmanager().executeTask((task, inputData) async {
     if (task != labDailyTaskName) return true;
     try {
+      // Background isolate needs its own engine binding + plugin init before
+      // rootBundle assets or the notifications channel are usable.
+      WidgetsFlutterBinding.ensureInitialized();
+      await initNotificationsPlugin();
       await runLabDailyCheck();
     } catch (_) {
       // Swallow — retrying is fine; don't fail the work which can trigger backoff.
