@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/user.dart';
+import '../../../services/digest_notification_service.dart';
+import '../../../services/lab_notification_service.dart'
+    show requestNotificationPermission;
 
 class DigestScheduleScreen extends StatefulWidget {
   const DigestScheduleScreen({super.key});
@@ -15,6 +18,18 @@ class DigestScheduleScreen extends StatefulWidget {
 class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
   DigestDay _selectedDay = DigestDay.mon;
   DigestTime _selectedTime = DigestTime.morning;
+  bool _saving = false;
+
+  Future<void> _onContinue() async {
+    setState(() => _saving = true);
+    try {
+      await requestNotificationPermission();
+      await saveAndScheduleDigest(_selectedDay, _selectedTime);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+    if (mounted) context.push('/onboarding/preview');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +49,6 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
               ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
               const SizedBox(height: 48),
 
-              // Days Segmented Control
               SegmentedButton<DigestDay>(
                 segments: const [
                   ButtonSegment(value: DigestDay.mon, label: Text('Mon')),
@@ -42,11 +56,8 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
                   ButtonSegment(value: DigestDay.fri, label: Text('Fri')),
                 ],
                 selected: {_selectedDay},
-                onSelectionChanged: (Set<DigestDay> newSelection) {
-                  setState(() {
-                    _selectedDay = newSelection.first;
-                  });
-                },
+                onSelectionChanged: (s) =>
+                    setState(() => _selectedDay = s.first),
                 style: SegmentedButton.styleFrom(
                   selectedBackgroundColor: AppColors.sageGreen,
                   selectedForegroundColor: AppColors.inkBlack,
@@ -54,24 +65,16 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
               ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
               const SizedBox(height: 32),
 
-              // Time Segmented Control
               SegmentedButton<DigestTime>(
                 segments: const [
                   ButtonSegment(
-                    value: DigestTime.morning,
-                    label: Text('Morning'),
-                  ),
+                      value: DigestTime.morning, label: Text('Morning')),
                   ButtonSegment(
-                    value: DigestTime.evening,
-                    label: Text('Evening'),
-                  ),
+                      value: DigestTime.evening, label: Text('Evening')),
                 ],
                 selected: {_selectedTime},
-                onSelectionChanged: (Set<DigestTime> newSelection) {
-                  setState(() {
-                    _selectedTime = newSelection.first;
-                  });
-                },
+                onSelectionChanged: (s) =>
+                    setState(() => _selectedTime = s.first),
                 style: SegmentedButton.styleFrom(
                   selectedBackgroundColor: AppColors.sageGreen,
                   selectedForegroundColor: AppColors.inkBlack,
@@ -81,46 +84,49 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
               const SizedBox(height: 48),
 
               Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.sageLight,
-                      borderRadius: BorderRadius.circular(12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.sageLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Your digest lands every ${_selectedDay.name.toUpperCase()} ${_selectedTime.name}.',
+                      style: const TextStyle(
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: 12,
+                        color: AppColors.sageDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Your digest lands every ${_selectedDay.name.toUpperCase()} ${_selectedTime.name}.',
-                          style: const TextStyle(
-                            fontFamily: 'JetBrains Mono',
-                            fontSize: 12,
-                            color: AppColors.sageDark,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'You can always change this in settings',
-                          style: theme.textTheme.labelSmall,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'You can always change this in settings',
+                      style: theme.textTheme.labelSmall,
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                  .animate()
-                  .fadeIn(delay: 500.ms)
-                  .scale(begin: const Offset(0.95, 0.95)),
+                  ],
+                ),
+              ).animate().fadeIn(delay: 500.ms).scale(begin: const Offset(0.95, 0.95)),
 
               const Spacer(),
 
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: ElevatedButton(
-                  onPressed: () => context.push('/onboarding/preview'),
+                  onPressed: _saving ? null : _onContinue,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Continue →'),
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Continue →'),
                 ),
               ),
             ],

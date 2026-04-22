@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PaperPulse — Academic Research, Curated Daily</title>
+  <meta name="description" content="Academic papers, curated daily. Beautiful AI summaries in 5 minutes — matched to what you care about.">
+  <meta property="og:title" content="PaperPulse — Academic Research, Curated Daily">
+  <meta property="og:description" content="Academic papers, curated daily. Beautiful AI summaries in 5 minutes.">
+  <meta property="og:type" content="website">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'paper-white': '#F7F4EE',
+            'ink-black':   '#1A1A1A',
+            'sage-green':  '#B2C9AD',
+            'sage-light':  '#E4EDE2',
+            'sage-dark':   '#4A7C59',
+            'mid-gray':    '#7A7A7A',
+            'light-gray':  '#D4D0C8',
+            'dark-gray':   '#3A3A3A',
+          },
+          fontFamily: {
+            serif: ['Instrument Serif', 'Georgia', 'serif'],
+            sans:  ['Quicksand', 'sans-serif'],
+            mono:  ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Quicksand:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="bg-paper-white font-sans text-ink-black">
+
+  <!-- NAV -->
+  <nav class="sticky top-0 bg-paper-white border-b border-light-gray z-50">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="font-serif text-xl tracking-tight">
+        <span class="text-ink-black">Paper</span><span class="text-sage-dark italic">Pulse</span>
+      </div>
+      <a href="#download"
+         class="bg-sage-green text-ink-black font-sans font-semibold text-sm px-5 py-2 rounded-full hover:opacity-90 transition-opacity">
+        Get Beta Access →
+      </a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="bg-ink-black text-paper-white">
+    <div class="max-w-5xl mx-auto px-6 py-20 flex flex-col items-center text-center">
+      <span class="font-mono text-[10px] tracking-widest uppercase bg-sage-light text-sage-dark border border-sage-green rounded-full px-4 py-1 mb-8">
+        Beta · Android
+      </span>
+      <h1 class="font-serif text-5xl md:text-6xl leading-tight mb-5">
+        Read the research.<br><em class="text-sage-green">Feed the curiosity.</em>
+      </h1>
+      <p class="text-mid-gray text-lg max-w-xl leading-relaxed mb-10">
+        Academic papers, curated daily. Beautiful AI summaries in 5 minutes —
+        matched to what you actually care about.
+      </p>
+      <div class="flex flex-wrap gap-4 justify-center mb-16">
+        <a href="#download"
+           class="bg-sage-green text-ink-black font-semibold px-8 py-4 rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18.5v-13A1.5 1.5 0 0 1 5.06 4.1l12.5 6.5a1.5 1.5 0 0 1 0 2.8l-12.5 6.5A1.5 1.5 0 0 1 3 18.5z"/></svg>
+          Get it on Google Play
+        </a>
+        <a href="#features"
+           class="border border-paper-white/20 text-paper-white font-medium px-8 py-4 rounded-xl hover:border-paper-white/50 transition-colors">
+          Learn more ↓
+        </a>
+      </div>
+
+      <!-- Curiosity Card mockup -->
+      <div class="bg-dark-gray rounded-2xl p-6 max-w-sm w-full text-left" style="box-shadow: 0 8px 32px rgba(0,0,0,0.30);">
+        <div class="flex justify-between items-center mb-4">
+          <span class="font-mono text-[9px] tracking-widest uppercase bg-sage-light text-sage-dark border border-sage-green rounded-full px-3 py-1">
+            Machine Learning
+          </span>
+          <span class="font-mono text-[9px] tracking-wider text-mid-gray border border-mid-gray rounded-full px-3 py-1">
+            arXiv
+          </span>
+        </div>
+        <h3 class="font-serif text-lg text-paper-white leading-snug mb-2">
+          Language Models Learn to Reason Without Being Told How
+        </h3>
+        <p class="font-mono text-[10px] text-mid-gray mb-4">Wei et al. · Google DeepMind</p>
+        <p class="text-paper-white/75 text-sm leading-relaxed mb-5">
+          Something unexpected emerged when researchers scaled up a language model without
+          adding any explicit reasoning instructions. The model began solving multi-step
+          problems in ways its creators hadn't programmed — and nobody fully understands why.
+        </p>
+        <button class="w-full bg-sage-green text-ink-black font-semibold text-sm py-3 rounded-xl">
+          Read Full Paper →
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="bg-paper-white py-20">
+    <div class="max-w-5xl mx-auto px-6">
+      <p class="font-mono text-[10px] tracking-widest uppercase text-sage-dark mb-3">Why PaperPulse</p>
+      <h2 class="font-serif text-4xl mb-12">Built for the intellectually restless.</h2>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="border border-light-gray rounded-2xl p-6">
+          <div class="w-10 h-10 bg-sage-light rounded-full flex items-center justify-center mb-4 text-xl">✨</div>
+          <h3 class="font-semibold text-base mb-2">AI-Summarised Curiosity Hooks</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Each paper becomes a 5-minute read that makes you want the full thing. Science journalism, not abstracts.</p>
+        </div>
+        <div class="border border-light-gray rounded-2xl p-6">
+          <div class="w-10 h-10 bg-sage-light rounded-full flex items-center justify-center mb-4 text-xl">🎯</div>
+          <h3 class="font-semibold text-base mb-2">Curated to Your Interests</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Pick your topics. Your weekly digest is built around what you actually care about — from ML to neuroscience to climate.</p>
+        </div>
+        <div class="border border-light-gray rounded-2xl p-6">
+          <div class="w-10 h-10 bg-sage-light rounded-full flex items-center justify-center mb-4 text-xl">🔖</div>
+          <h3 class="font-semibold text-base mb-2">Save, Share & Streak</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Bookmark papers, share beautiful cards to social media, and build a daily reading habit with streaks.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="bg-sage-light py-20">
+    <div class="max-w-5xl mx-auto px-6">
+      <p class="font-mono text-[10px] tracking-widest uppercase text-sage-dark mb-3">How it works</p>
+      <h2 class="font-serif text-4xl mb-12">Three steps to your first digest.</h2>
+      <div class="grid md:grid-cols-3 gap-10">
+        <div>
+          <div class="font-serif text-5xl text-sage-green mb-3">1</div>
+          <h3 class="font-semibold text-base mb-2">Pick your topics</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Choose from Machine Learning, Neuroscience, Climate Science, Physics, Economics and more.</p>
+        </div>
+        <div>
+          <div class="font-serif text-5xl text-sage-green mb-3">2</div>
+          <h3 class="font-semibold text-base mb-2">Get your weekly digest</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Every Monday, 6–8 curated papers land in your feed. Set the day and time that works for you.</p>
+        </div>
+        <div>
+          <div class="font-serif text-5xl text-sage-green mb-3">3</div>
+          <h3 class="font-semibold text-base mb-2">Read, save, or go deeper</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Swipe to bookmark, tap to read the curiosity hook, or jump to the full paper on arXiv.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD CTA -->
+  <section id="download" class="bg-ink-black text-paper-white py-20">
+    <div class="max-w-5xl mx-auto px-6 text-center">
+      <h2 class="font-serif text-5xl mb-4">Join the beta.<br>It's free.</h2>
+      <p class="text-mid-gray text-lg mb-10 max-w-md mx-auto leading-relaxed">
+        You're one of the first people to try PaperPulse.<br>
+        Android only for now — iOS coming soon.
+      </p>
+      <!-- Replace PLAY_STORE_URL with the internal testing link from Play Console -->
+      <a href="PLAY_STORE_URL"
+         class="inline-flex items-center gap-4 bg-paper-white text-ink-black px-8 py-4 rounded-2xl hover:opacity-90 transition-opacity">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#3DDC84"><path d="M3 18.5v-13A1.5 1.5 0 0 1 5.06 4.1l12.5 6.5a1.5 1.5 0 0 1 0 2.8l-12.5 6.5A1.5 1.5 0 0 1 3 18.5z"/></svg>
+        <div class="text-left">
+          <div class="font-mono text-[9px] tracking-widest uppercase text-mid-gray">Get it on</div>
+          <div class="font-semibold text-base">Google Play</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-paper-white border-t border-light-gray py-8">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="font-mono text-[10px] text-mid-gray">© 2026 PaperPulse. Beta v0.1.</p>
+      <div class="flex gap-6">
+        <a href="privacy-policy.html" class="font-mono text-[10px] text-mid-gray hover:text-sage-dark transition-colors">Privacy Policy</a>
+        <a href="terms.html" class="font-mono text-[10px] text-mid-gray hover:text-sage-dark transition-colors">Terms of Service</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

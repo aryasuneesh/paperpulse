@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/paper.dart';
-import '../../../../data/providers/papers_provider.dart';
+import 'personalized_digest_provider.dart';
 
 final digestStackProvider =
     NotifierProvider<DigestStackNotifier, DigestStackState>(
@@ -43,7 +43,7 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
     ref.onDispose(() => _disposed = true);
 
     // Listen to the shared cached provider
-    final papersAsync = ref.watch(papersProvider);
+    final papersAsync = ref.watch(personalizedDigestProvider);
     papersAsync.when(
       loading: () {},
       error: (e, _) {

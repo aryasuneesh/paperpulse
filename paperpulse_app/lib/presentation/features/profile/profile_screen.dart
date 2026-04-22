@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/user.dart';
+import '../../../services/digest_notification_service.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../data/models/bookmark.dart';
 import '../library/providers/bookmark_provider.dart';
@@ -263,62 +265,78 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showScheduleModal(BuildContext context, ThemeData theme) {
+  void _showScheduleModal(BuildContext context, ThemeData theme) async {
+    final saved = await loadDigestSchedule();
+    var selectedDay = saved?.$1 ?? DigestDay.mon;
+    var selectedTime = saved?.$2 ?? DigestTime.morning;
+
+    if (!context.mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Digest Schedule', style: theme.textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            Text('When would you like to receive your digest?',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: AppColors.midGray)),
-            const SizedBox(height: 32),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'Mon', label: Text('Mon')),
-                ButtonSegment(value: 'Wed', label: Text('Wed')),
-                ButtonSegment(value: 'Fri', label: Text('Fri')),
-              ],
-              selected: const {'Mon'},
-              onSelectionChanged: (_) {},
-              style: SegmentedButton.styleFrom(
-                selectedBackgroundColor: AppColors.sageGreen,
-                selectedForegroundColor: AppColors.inkBlack,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Digest Schedule', style: theme.textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text('When would you like to receive your digest?',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: AppColors.midGray)),
+              const SizedBox(height: 32),
+              SegmentedButton<DigestDay>(
+                segments: const [
+                  ButtonSegment(value: DigestDay.mon, label: Text('Mon')),
+                  ButtonSegment(value: DigestDay.wed, label: Text('Wed')),
+                  ButtonSegment(value: DigestDay.fri, label: Text('Fri')),
+                ],
+                selected: {selectedDay},
+                onSelectionChanged: (s) =>
+                    setModalState(() => selectedDay = s.first),
+                style: SegmentedButton.styleFrom(
+                  selectedBackgroundColor: AppColors.sageGreen,
+                  selectedForegroundColor: AppColors.inkBlack,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'Morning', label: Text('Morning')),
-                ButtonSegment(value: 'Evening', label: Text('Evening')),
-              ],
-              selected: const {'Morning'},
-              onSelectionChanged: (_) {},
-              style: SegmentedButton.styleFrom(
-                selectedBackgroundColor: AppColors.sageGreen,
-                selectedForegroundColor: AppColors.inkBlack,
+              const SizedBox(height: 16),
+              SegmentedButton<DigestTime>(
+                segments: const [
+                  ButtonSegment(
+                      value: DigestTime.morning, label: Text('Morning')),
+                  ButtonSegment(
+                      value: DigestTime.evening, label: Text('Evening')),
+                ],
+                selected: {selectedTime},
+                onSelectionChanged: (s) =>
+                    setModalState(() => selectedTime = s.first),
+                style: SegmentedButton.styleFrom(
+                  selectedBackgroundColor: AppColors.sageGreen,
+                  selectedForegroundColor: AppColors.inkBlack,
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: AppColors.inkBlack,
-                foregroundColor: AppColors.paperWhite,
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () async {
+                  final nav = Navigator.of(context);
+                  await saveAndScheduleDigest(selectedDay, selectedTime);
+                  nav.pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: AppColors.inkBlack,
+                  foregroundColor: AppColors.paperWhite,
+                ),
+                child: const Text('Save Changes'),
               ),
-              child: const Text('Save Changes'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

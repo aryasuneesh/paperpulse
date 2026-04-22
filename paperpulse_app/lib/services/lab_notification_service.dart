@@ -3,6 +3,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
+import 'digest_notification_service.dart' show digestTaskName, runDigestNotification;
+import 'daily_paper_notification_service.dart'
+    show dailyPaperTaskName, runDailyPaperRollup;
 import '../data/models/lab_pref.dart';
 import '../data/models/paper.dart';
 import '../data/providers/lab_catalog_provider.dart';
@@ -58,15 +61,18 @@ Future<bool> requestNotificationPermission() async {
 @pragma('vm:entry-point')
 void labBackgroundCallback() {
   Workmanager().executeTask((task, inputData) async {
-    if (task != labDailyTaskName) return true;
     try {
-      // Background isolate needs its own engine binding + plugin init before
-      // rootBundle assets or the notifications channel are usable.
       WidgetsFlutterBinding.ensureInitialized();
       await initNotificationsPlugin();
-      await runLabDailyCheck();
+      if (task == labDailyTaskName) {
+        await runLabDailyCheck();
+      } else if (task == digestTaskName) {
+        await runDigestNotification();
+      } else if (task == dailyPaperTaskName) {
+        await runDailyPaperRollup();
+      }
     } catch (_) {
-      // Swallow — retrying is fine; don't fail the work which can trigger backoff.
+      // Swallow — don't trigger WorkManager backoff on transient errors.
     }
     return true;
   });
