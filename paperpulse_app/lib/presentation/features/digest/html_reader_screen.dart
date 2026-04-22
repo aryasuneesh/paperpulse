@@ -164,7 +164,7 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
       if (text.length === 0) {
         window._ppRange = null;
         window.SelectionHandler.postMessage(JSON.stringify({text: '', sentence: ''}));
-      } else if (text.length <= 500) {
+      } else {
         try {
           var range = sel.getRangeAt(0);
           window._ppRange = range.cloneRange();

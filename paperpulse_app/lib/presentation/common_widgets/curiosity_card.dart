@@ -198,7 +198,7 @@ class CuriosityCard extends StatelessWidget {
       child: Text(
         paper.topicTags.first.toUpperCase(),
         style: theme.textTheme.labelSmall?.copyWith(
-          color: AppColors.sageGreen,
+          color: AppColors.inkBlack,
           fontWeight: FontWeight.bold,
         ),
       ),

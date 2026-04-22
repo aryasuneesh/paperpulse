@@ -203,6 +203,7 @@ class _LibraryPaperItem extends StatelessWidget {
               current: currentStatus,
               theme: theme,
               onSelect: onStatusChange,
+              onRemove: onRemove,
             ),
           ),
         ],
@@ -216,11 +217,13 @@ class _StatusMenu extends StatelessWidget {
     required this.current,
     required this.theme,
     required this.onSelect,
+    required this.onRemove,
   });
 
   final BookmarkStatus current;
   final ThemeData theme;
   final ValueChanged<BookmarkStatus> onSelect;
+  final VoidCallback onRemove;
 
   static const _labels = {
     BookmarkStatus.unread: 'Unread',
@@ -230,8 +233,8 @@ class _StatusMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<BookmarkStatus>(
-      tooltip: 'Change status',
+    return PopupMenuButton<_MenuAction>(
+      tooltip: 'Change status or remove',
       padding: EdgeInsets.zero,
       icon: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -248,14 +251,41 @@ class _StatusMenu extends StatelessWidget {
           ),
         ),
       ),
-      onSelected: onSelect,
-      itemBuilder: (_) => BookmarkStatus.values
-          .where((s) => s != current)
-          .map((s) => PopupMenuItem(
-                value: s,
+      onSelected: (action) {
+        if (action.isRemove) {
+          onRemove();
+        } else {
+          onSelect(action.status!);
+        }
+      },
+      itemBuilder: (_) => [
+        ...BookmarkStatus.values.where((s) => s != current).map(
+              (s) => PopupMenuItem(
+                value: _MenuAction.status(s),
                 child: Text(_labels[s]!, style: theme.textTheme.bodyMedium),
-              ))
-          .toList(),
+              ),
+            ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: const _MenuAction.remove(),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: AppColors.cherryBlossom,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Remove from Library',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.cherryBlossom,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -264,4 +294,13 @@ class _StatusMenu extends StatelessWidget {
         BookmarkStatus.in_progress => AppColors.morningHaze,
         BookmarkStatus.finished => AppColors.quietSky,
       };
+}
+
+class _MenuAction {
+  final BookmarkStatus? status;
+  final bool isRemove;
+  const _MenuAction.status(BookmarkStatus this.status) : isRemove = false;
+  const _MenuAction.remove()
+      : status = null,
+        isRemove = true;
 }

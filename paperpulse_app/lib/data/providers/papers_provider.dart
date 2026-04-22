@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/paper.dart';
 import '../repositories/paper_repository.dart';
+import '../../services/topics_catalog_service.dart';
 
 const _cacheKey = 'paperpulse_papers_cache';
 const _cacheDateKey = 'paperpulse_papers_cache_date';
@@ -30,7 +32,10 @@ class PapersNotifier extends AsyncNotifier<List<Paper>> {
               .whereType<Map<String, dynamic>>()
               .map(Paper.fromJson)
               .toList();
-          if (papers.isNotEmpty) return papers;
+          if (papers.isNotEmpty) {
+            unawaited(recordTopicsFromPapers(papers));
+            return papers;
+          }
         } catch (_) {}
       }
     }
@@ -44,6 +49,7 @@ class PapersNotifier extends AsyncNotifier<List<Paper>> {
       await prefs.setString(_cacheDateKey, todayStr);
     } catch (_) {}
 
+    unawaited(recordTopicsFromPapers(papers));
     return papers;
   }
 

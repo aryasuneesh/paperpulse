@@ -141,7 +141,9 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'You can always change this in settings',
-                      style: theme.textTheme.labelSmall,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.inkBlack,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],

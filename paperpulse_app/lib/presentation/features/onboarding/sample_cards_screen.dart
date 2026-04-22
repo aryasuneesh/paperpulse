@@ -144,8 +144,10 @@ class _PickerRow extends StatelessWidget {
                 children: [
                   Text(
                     paper.title,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.inkBlack : null,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -153,8 +155,10 @@ class _PickerRow extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       paper.topicTags.join(' · '),
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: AppColors.midGray),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color:
+                            selected ? AppColors.sageDark : AppColors.midGray,
+                      ),
                     ),
                   ],
                 ],

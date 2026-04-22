@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../services/digest_personalization_service.dart';
+import '../../../services/topics_catalog_service.dart';
+import '../digest/providers/personalized_digest_provider.dart';
 
-class InterestPickerScreen extends StatefulWidget {
+class InterestPickerScreen extends ConsumerStatefulWidget {
   const InterestPickerScreen({super.key});
 
   @override
-  State<InterestPickerScreen> createState() => _InterestPickerScreenState();
+  ConsumerState<InterestPickerScreen> createState() =>
+      _InterestPickerScreenState();
 }
 
-class _InterestPickerScreenState extends State<InterestPickerScreen> {
-  // Topics reflect the actual HuggingFace Daily Papers catalogue (ML/AI domain)
-  final List<String> _suggestedTopics = [
+class _InterestPickerScreenState extends ConsumerState<InterestPickerScreen> {
+  // Baseline topics; merged with a dynamic catalog accumulated from the API
+  // so rare topics stay available on days they don't appear in the feed.
+  static const List<String> _baselineTopics = [
     'Machine Learning',
     'Computer Vision',
     'Language Models',
@@ -28,7 +34,28 @@ class _InterestPickerScreenState extends State<InterestPickerScreen> {
     'AI Research',
   ];
 
+  List<String> _suggestedTopics = List.of(_baselineTopics);
   final Set<String> _selectedTopics = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTopics();
+  }
+
+  Future<void> _loadTopics() async {
+    final catalog = await loadTopicsCatalog();
+    if (!mounted) return;
+    final seen = <String>{};
+    final merged = <String>[];
+    for (final t in [..._baselineTopics, ...catalog]) {
+      if (seen.add(t)) merged.add(t);
+    }
+    setState(() => _suggestedTopics = merged);
+    final existing = await loadInterestTopics();
+    if (!mounted) return;
+    setState(() => _selectedTopics.addAll(existing));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +130,10 @@ class _InterestPickerScreenState extends State<InterestPickerScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: ElevatedButton(
                   onPressed: isButtonEnabled
-                      ? () {
+                      ? () async {
+                          await saveInterestTopics(_selectedTopics);
+                          ref.invalidate(interestTopicsProvider);
+                          if (!mounted) return;
                           if (fromProfile) {
                             context.pop();
                           } else {

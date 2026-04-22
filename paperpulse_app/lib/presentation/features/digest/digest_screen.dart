@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
@@ -7,9 +8,37 @@ import '../../common_widgets/curiosity_card.dart';
 import '../library/providers/bookmark_provider.dart';
 import 'paper_detail_modal.dart';
 import 'providers/digest_stack_provider.dart';
+import 'providers/personalized_digest_provider.dart';
 import 'providers/streak_provider.dart';
 import 'share_card_sheet.dart';
 import 'widgets/streak_popup.dart';
+
+const _digestTutorialSeenKey = 'paperpulse_digest_tutorial_seen';
+
+final digestTutorialSeenProvider =
+    NotifierProvider<DigestTutorialSeenNotifier, bool>(
+      DigestTutorialSeenNotifier.new,
+    );
+
+class DigestTutorialSeenNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    _load();
+    return false;
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool(_digestTutorialSeenKey) ?? false;
+  }
+
+  Future<void> markSeen() async {
+    if (state) return;
+    state = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_digestTutorialSeenKey, true);
+  }
+}
 
 class DigestScreen extends ConsumerWidget {
   const DigestScreen({super.key});
@@ -43,6 +72,7 @@ class DigestScreen extends ConsumerWidget {
         });
       }
       ref.read(digestStackProvider.notifier).swipeCard();
+      ref.read(digestTutorialSeenProvider.notifier).markSeen();
       final didIncrement =
           await ref.read(streakProvider.notifier).markActivity();
       if (context.mounted && didIncrement) {
@@ -139,7 +169,7 @@ class DigestScreen extends ConsumerWidget {
     return Stack(
       children: [
         _buildCardStack(context, ref, papers, currentIndex),
-        if (currentIndex == 0) // First-time tutorial overlay
+        if (currentIndex == 0 && !ref.watch(digestTutorialSeenProvider))
           Positioned(
             bottom: 30,
             left: 20,
@@ -376,43 +406,58 @@ class DigestScreen extends ConsumerWidget {
   }
 
   Widget _buildEmptyState(ThemeData theme, WidgetRef ref) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: AppColors.sageLight,
-            shape: BoxShape.circle,
+    final mode = ref.watch(digestStackProvider).mode;
+    final extendedAsync = ref.watch(extendedDigestProvider);
+    final extendedCount = extendedAsync.asData?.value.length ?? 0;
+    final inExtended = mode == DigestMode.extended;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: const BoxDecoration(
+              color: AppColors.sageLight,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(Icons.check, size: 40, color: AppColors.sageDark),
+            ),
           ),
-          child: const Center(
-            child: Icon(Icons.check, size: 40, color: AppColors.sageDark),
+          const SizedBox(height: 24),
+          Text('All done!', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            inExtended
+                ? 'You\'ve seen everything we have for today.\nYour next digest lands soon.'
+                : extendedCount > 0
+                    ? 'Want to dig deeper into your interests?'
+                    : 'Your next digest lands soon.\nCheck back tomorrow.',
+            style:
+                theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
+            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 24),
-        Text('You\'re all caught up.', style: theme.textTheme.titleLarge),
-        const SizedBox(height: 8),
-        Text(
-          'Your next digest lands Monday morning.\nBrowse in the meantime.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.midGray),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 32),
-        ElevatedButton(
-          onPressed: () {
-            // For testing purposes during MVP, let's allow resetting the stack
-            ref.read(digestStackProvider.notifier).resetStack();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.paperWhite,
-            foregroundColor: AppColors.inkBlack,
-            side: const BorderSide(color: AppColors.lightGray),
-            elevation: 0,
-          ),
-          child: const Text('Read Again (Demo)'),
-        ),
-      ],
+          const SizedBox(height: 32),
+          if (!inExtended && extendedCount > 0)
+            ElevatedButton(
+              onPressed: () =>
+                  ref.read(digestStackProvider.notifier).showExtended(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.sageGreen,
+                foregroundColor: AppColors.inkBlack,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                elevation: 0,
+              ),
+              child: Text('See $extendedCount more papers →'),
+            ),
+        ],
+      ),
     );
   }
 }
