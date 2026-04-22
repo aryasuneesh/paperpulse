@@ -7,9 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/user.dart';
+import '../../../services/daily_paper_notification_service.dart';
 import '../../../services/digest_notification_service.dart';
+import '../../../services/digest_personalization_service.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../data/models/bookmark.dart';
+import '../digest/providers/personalized_digest_provider.dart';
 import '../library/providers/bookmark_provider.dart';
 import '../library/providers/highlight_provider.dart';
 import 'highlights_screen.dart';
@@ -162,7 +165,7 @@ class ProfileScreen extends ConsumerWidget {
 
               // Menu items
               _tile('Digest Schedule', Icons.calendar_today, theme,
-                  onTap: () => _showScheduleModal(context, theme)),
+                  onTap: () => _showScheduleModal(context, theme, ref)),
               _tile('Interest Topics', Icons.tag, theme,
                   onTap: () => context.push('/onboarding/interests?from=profile')),
               _tile('Manage Labs', Icons.science_outlined, theme,
@@ -265,10 +268,13 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showScheduleModal(BuildContext context, ThemeData theme) async {
+  void _showScheduleModal(
+      BuildContext context, ThemeData theme, WidgetRef ref) async {
     final saved = await loadDigestSchedule();
     var selectedDay = saved?.$1 ?? DigestDay.mon;
     var selectedTime = saved?.$2 ?? DigestTime.morning;
+    var digestSize = await loadDigestSize();
+    var dailyEnabled = await loadDailyNotifEnabled();
 
     if (!context.mounted) return;
 
@@ -321,11 +327,43 @@ class ProfileScreen extends ConsumerWidget {
                   selectedForegroundColor: AppColors.inkBlack,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              Text('Papers per digest: $digestSize',
+                  style: theme.textTheme.labelMedium),
+              Slider(
+                value: digestSize.toDouble(),
+                min: digestSizeMin.toDouble(),
+                max: digestSizeMax.toDouble(),
+                divisions: digestSizeMax - digestSizeMin,
+                label: '$digestSize',
+                onChanged: (v) =>
+                    setModalState(() => digestSize = v.round()),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: dailyEnabled,
+                onChanged: (v) => setModalState(() => dailyEnabled = v),
+                title: const Text('Daily notifications'),
+                subtitle: const Text(
+                  'Notify me when new papers match my interests',
+                  style: TextStyle(fontSize: 12),
+                ),
+                activeThumbColor: AppColors.sageDark,
+              ),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
                   final nav = Navigator.of(context);
                   await saveAndScheduleDigest(selectedDay, selectedTime);
+                  await saveDigestSize(digestSize);
+                  await saveDailyNotifEnabled(dailyEnabled);
+                  if (dailyEnabled) {
+                    await ensureDailyPaperTaskRegistered();
+                  } else {
+                    await cancelDailyPaperTask();
+                  }
+                  ref.invalidate(digestSizeProvider);
                   nav.pop();
                 },
                 style: ElevatedButton.styleFrom(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
@@ -55,6 +56,9 @@ class PaperDetailModal extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isArxiv = paper.source == PaperSource.arxiv;
+    final bookmarks = ref.watch(bookmarkProvider);
+    final matches = bookmarks.where((b) => b.paperId == paper.id);
+    final savedAt = matches.isEmpty ? null : matches.first.createdAt;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.9,
@@ -115,6 +119,9 @@ class PaperDetailModal extends ConsumerWidget {
               const SizedBox(height: 16),
               _buildMetadataRow('Source', paper.source.name.toUpperCase()),
               _buildMetadataRow('Published', '${paper.publishedAt.year}'),
+              if (savedAt != null)
+                _buildMetadataRow(
+                    'Saved', DateFormat.yMMMd().format(savedAt)),
               _buildMetadataRow(
                 'Citations',
                 paper.citationCount == 0 ? 'N/A' : '${paper.citationCount}',

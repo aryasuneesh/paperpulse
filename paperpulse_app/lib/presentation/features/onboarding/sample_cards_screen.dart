@@ -1,42 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/paper.dart';
-import '../../common_widgets/curiosity_card.dart';
+import '../../../data/providers/papers_provider.dart';
+import '../library/providers/bookmark_provider.dart';
 
-class SampleCardsScreen extends StatelessWidget {
+const int _onboardingPickerTarget = 5;
+
+class SampleCardsScreen extends ConsumerStatefulWidget {
   const SampleCardsScreen({super.key});
+
+  @override
+  ConsumerState<SampleCardsScreen> createState() => _SampleCardsScreenState();
+}
+
+class _SampleCardsScreenState extends ConsumerState<SampleCardsScreen> {
+  final Set<String> _selectedIds = {};
+
+  void _toggle(Paper p) {
+    setState(() {
+      if (_selectedIds.contains(p.id)) {
+        _selectedIds.remove(p.id);
+      } else {
+        _selectedIds.add(p.id);
+      }
+    });
+  }
+
+  void _onContinue(List<Paper> papers) {
+    final notifier = ref.read(bookmarkProvider.notifier);
+    for (final p in papers.where((p) => _selectedIds.contains(p.id))) {
+      if (!notifier.isBookmarked(p.id)) {
+        notifier.toggleBookmark(p);
+      }
+    }
+    context.push('/onboarding/account');
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // Mock data for sample
-    final mockPaper1 = Paper(
-      id: '1',
-      title: 'Attention Is All You Need',
-      authors: ['Ashish Vaswani', 'Noam Shazeer'],
-      source: PaperSource.arxiv,
-      sourceUrl: '',
-      publishedAt: DateTime(2017),
-      topicTags: ['Machine Learning'],
-      curiosityHook:
-          'The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism.\n\nBut what if we dispense with recurrence and convolutions entirely?',
-    );
-
-    final mockPaper2 = Paper(
-      id: '2',
-      title:
-          'Dopamine reward prediction-error signalling: a two-component response',
-      authors: ['Wolfram Schultz'],
-      source: PaperSource.semantic_scholar,
-      sourceUrl: '',
-      publishedAt: DateTime(2016),
-      topicTags: ['Neuroscience'],
-      curiosityHook:
-          'For decades, we thought dopamine was simply the "pleasure" chemical. But looking closer at the specific timing of neuron firing reveals something far more interesting: a two-part response that calculates exactly how wrong our expectations were.\n\nHow does the brain mathematically compute a surprise?',
-    );
+    final papersAsync = ref.watch(papersProvider);
 
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
@@ -46,55 +52,115 @@ class SampleCardsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Here\'s a taste', style: theme.textTheme.headlineLarge),
+              Text("Pick 5 papers you'd read",
+                  style: theme.textTheme.headlineLarge),
               const SizedBox(height: 8),
               Text(
-                'Real papers. Real curiosity.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.midGray,
-                  fontSize: 15,
-                ),
+                "We'll use these to personalize your digest.",
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: AppColors.midGray, fontSize: 15),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Expanded(
-                child: Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Transform.translate(
-                        offset: const Offset(0, 24),
-                        child: Transform.scale(
-                          scale: 0.95,
-                          child: IgnorePointer(
-                            child: Opacity(
-                              opacity: 0.5,
-                              child: CuriosityCard(paper: mockPaper2),
-                            ),
-                          ),
-                        ),
-                      ),
-                      CuriosityCard(
-                        paper: mockPaper1,
-                        onReadFullTap: () {
-                          // No-op for sample
-                        },
-                      ),
-                    ],
+                child: papersAsync.when(
+                  data: (papers) => ListView.separated(
+                    itemCount: papers.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) {
+                      final p = papers[i];
+                      final selected = _selectedIds.contains(p.id);
+                      return _PickerRow(
+                        paper: p,
+                        selected: selected,
+                        onTap: () => _toggle(p),
+                      );
+                    },
                   ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      Center(child: Text('Could not load papers: $e')),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: ElevatedButton(
-                  onPressed: () => context.push('/onboarding/account'),
+                  onPressed: _selectedIds.length >= _onboardingPickerTarget
+                      ? () => _onContinue(papersAsync.asData?.value ?? const [])
+                      : null,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('This is my kind of reading →'),
+                  child: Text(
+                    'Continue (${_selectedIds.length}/$_onboardingPickerTarget) →',
+                  ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerRow extends StatelessWidget {
+  const _PickerRow({
+    required this.paper,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Paper paper;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.sageLight : theme.colorScheme.surface,
+          border: Border.all(
+            color: selected ? AppColors.sageGreen : AppColors.lightGray,
+            width: selected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: selected ? AppColors.sageDark : AppColors.midGray,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    paper.title,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (paper.topicTags.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      paper.topicTags.join(' · '),
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: AppColors.midGray),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

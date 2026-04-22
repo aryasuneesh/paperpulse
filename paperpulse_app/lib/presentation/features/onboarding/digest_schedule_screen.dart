@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/user.dart';
+import '../../../services/daily_paper_notification_service.dart';
 import '../../../services/digest_notification_service.dart';
+import '../../../services/digest_personalization_service.dart';
 import '../../../services/lab_notification_service.dart'
     show requestNotificationPermission;
 
@@ -18,6 +20,8 @@ class DigestScheduleScreen extends StatefulWidget {
 class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
   DigestDay _selectedDay = DigestDay.mon;
   DigestTime _selectedTime = DigestTime.morning;
+  int _digestSize = digestSizeDefault;
+  bool _dailyEnabled = false;
   bool _saving = false;
 
   Future<void> _onContinue() async {
@@ -25,6 +29,13 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
     try {
       await requestNotificationPermission();
       await saveAndScheduleDigest(_selectedDay, _selectedTime);
+      await saveDigestSize(_digestSize);
+      await saveDailyNotifEnabled(_dailyEnabled);
+      if (_dailyEnabled) {
+        await ensureDailyPaperTaskRegistered();
+      } else {
+        await cancelDailyPaperTask();
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -81,7 +92,33 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
                 ),
               ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
 
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
+
+              Text('Papers per digest: $_digestSize',
+                  style: theme.textTheme.labelMedium),
+              Slider(
+                value: _digestSize.toDouble(),
+                min: digestSizeMin.toDouble(),
+                max: digestSizeMax.toDouble(),
+                divisions: digestSizeMax - digestSizeMin,
+                label: '$_digestSize',
+                onChanged: (v) => setState(() => _digestSize = v.round()),
+              ),
+
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _dailyEnabled,
+                onChanged: (v) => setState(() => _dailyEnabled = v),
+                title: const Text('Daily notifications'),
+                subtitle: const Text(
+                  'Notify me when new papers match my interests',
+                  style: TextStyle(fontSize: 12),
+                ),
+                activeThumbColor: AppColors.sageDark,
+              ),
+
+              const SizedBox(height: 24),
 
               Container(
                 padding: const EdgeInsets.all(16),
