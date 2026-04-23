@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/services/account_deletion_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/user.dart';
 import '../../../services/daily_paper_notification_service.dart';
 import '../../../services/digest_notification_service.dart';
 import '../../../services/digest_personalization_service.dart';
-import '../../../core/providers/user_provider.dart';
 import '../../../data/models/bookmark.dart';
 import '../digest/providers/personalized_digest_provider.dart';
 import '../library/providers/bookmark_provider.dart';
@@ -25,15 +24,8 @@ class ProfileScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final bookmarks = ref.watch(bookmarkProvider);
     final highlights = ref.watch(highlightProvider);
-    final isGuest = ref.watch(isGuestProvider);
 
-    final supabaseUser = Supabase.instance.client.auth.currentUser;
-    final displayName = isGuest
-        ? 'Guest'
-        : (supabaseUser?.userMetadata?['full_name'] as String? ?? 'User');
-    final avatarUrl = isGuest
-        ? null
-        : supabaseUser?.userMetadata?['avatar_url'] as String?;
+    const displayName = 'Reader';
 
     final finishedPapersCount =
         bookmarks.where((b) => b.status == BookmarkStatus.finished).length;
@@ -63,18 +55,14 @@ class ProfileScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 32, 20, 48),
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 32,
                       backgroundColor: AppColors.sageGreen,
-                      backgroundImage:
-                          avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                      child: avatarUrl == null
-                          ? Icon(
-                              isGuest ? Icons.person_outline : Icons.person,
-                              color: AppColors.inkBlack,
-                              size: 32,
-                            )
-                          : null,
+                      child: Icon(
+                        Icons.person_outline,
+                        color: AppColors.inkBlack,
+                        size: 32,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -87,20 +75,12 @@ class ProfileScreen extends ConsumerWidget {
                               color: AppColors.paperWhite,
                             ),
                           ),
-                          if (!isGuest && supabaseUser?.email != null)
-                            Text(
-                              supabaseUser!.email!,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: AppColors.midGray,
-                              ),
+                          Text(
+                            'Local device only',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.midGray,
                             ),
-                          if (isGuest)
-                            Text(
-                              'Local device only',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: AppColors.midGray,
-                              ),
-                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -173,8 +153,7 @@ class ProfileScreen extends ConsumerWidget {
               _tile('Notifications', Icons.notifications_outlined, theme,
                   onTap: () => _showNotificationsSheet(context, theme)),
               _tile('Account', Icons.person_outline, theme,
-                  onTap: () => _showAccountSheet(context, theme, ref, isGuest,
-                      displayName, supabaseUser?.email)),
+                  onTap: () => _showAccountSheet(context, theme, displayName)),
               _tile('Buy Me a Coffee', Icons.coffee_outlined, theme,
                   onTap: () => _openBuyMeACoffee()),
 
@@ -394,10 +373,7 @@ class ProfileScreen extends ConsumerWidget {
   void _showAccountSheet(
     BuildContext context,
     ThemeData theme,
-    WidgetRef ref,
-    bool isGuest,
     String displayName,
-    String? email,
   ) {
     showModalBottomSheet(
       context: context,
@@ -412,13 +388,21 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Account', style: theme.textTheme.headlineMedium),
+            const SizedBox(height: 8),
+            Text(
+              'PaperPulse stores your reading history only on this device. '
+              'No cloud account is created.',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.midGray,
+              ),
+            ),
             const SizedBox(height: 16),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
+              leading: const CircleAvatar(
                 backgroundColor: AppColors.sageLight,
                 child: Icon(
-                  isGuest ? Icons.person_outline : Icons.person,
+                  Icons.person_outline,
                   color: AppColors.sageDark,
                 ),
               ),
@@ -426,47 +410,71 @@ class ProfileScreen extends ConsumerWidget {
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
               subtitle: Text(
-                email ?? 'Guest — local device only',
+                'Local device only',
                 style: theme.textTheme.labelSmall
                     ?.copyWith(color: AppColors.midGray),
               ),
             ),
             const SizedBox(height: 24),
-            if (isGuest)
-              ElevatedButton.icon(
-                icon: const Icon(Icons.g_mobiledata, size: 24),
-                label: const Text('Sign in with Google'),
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.go('/onboarding/account');
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: AppColors.inkBlack,
-                  foregroundColor: AppColors.paperWhite,
-                ),
-              )
-            else
-              OutlinedButton(
-                onPressed: () async {
-                  await Supabase.instance.client.auth.signOut();
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    context.go('/onboarding/account');
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: AppColors.lightGray),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text('Sign Out',
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: AppColors.inkBlack)),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              label: const Text('Delete all my data'),
+              onPressed: () => _confirmDelete(context, theme),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: Colors.red.shade700,
+                side: BorderSide(color: Colors.red.shade200),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Wipes bookmarks, highlights, reading history, and preferences. '
+              'Cannot be undone.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: AppColors.midGray),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, ThemeData theme) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
+        title: const Text('Delete all data?'),
+        content: const Text(
+          'This permanently removes your bookmarks, highlights, '
+          'reading history, interests, schedule, and caches from this '
+          'device. You will be taken back to onboarding. This cannot '
+          'be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final nav = Navigator.of(dialogContext);
+              final rootNav = Navigator.of(context);
+              final router = GoRouter.of(context);
+              nav.pop();
+              await AccountDeletionService.deleteEverything();
+              if (rootNav.mounted) {
+                rootNav.maybePop(); // dismiss the bottom sheet
+              }
+              router.go('/splash');
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

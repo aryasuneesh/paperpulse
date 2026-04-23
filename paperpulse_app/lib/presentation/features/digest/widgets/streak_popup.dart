@@ -33,7 +33,7 @@ class _StreakPopupState extends State<StreakPopup>
     "The best researchers show up every day.",
     "Knowledge compounds. So does your streak.",
     "You're building a habit that matters.",
-    "Keep going — breakthroughs reward consistency.",
+    "Keep going. Breakthroughs reward consistency.",
   ];
 
   @override

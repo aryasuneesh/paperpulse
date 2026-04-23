@@ -4,3 +4,4 @@ docs/
 .worktrees/
 .superpowers/
 *.aab
+.agent/

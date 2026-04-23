@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show sharedPrefs;
 
 const _deviceUuidKey = 'paperpulse_device_uuid';
@@ -19,30 +18,13 @@ String _generateUuidV4() {
       '${hex(bytes.sublist(10, 16))}';
 }
 
+/// Stable device-local UUID (persists across app restarts).
+/// PaperPulse identifies users purely by device in the beta — no cloud auth.
 final currentUserIdProvider = Provider<String>((ref) {
-  // Prefer authenticated Supabase user ID
-  // Wrap in try/catch in case Supabase hasn't been initialized (e.g., in tests)
-  try {
-    final authId = Supabase.instance.client.auth.currentUser?.id;
-    if (authId != null && authId.isNotEmpty) return authId;
-  } catch (_) {
-    // Supabase not initialized — fall through to device UUID
-  }
-
-  // Fall back to a stable device-local UUID (persists across app restarts)
   final stored = sharedPrefs.getString(_deviceUuidKey);
   if (stored != null && stored.isNotEmpty) return stored;
 
   final newId = _generateUuidV4();
   sharedPrefs.setString(_deviceUuidKey, newId);
   return newId;
-});
-
-/// True when the user has no Supabase session (device UUID identity).
-final isGuestProvider = Provider<bool>((ref) {
-  try {
-    return Supabase.instance.client.auth.currentUser == null;
-  } catch (_) {
-    return true;
-  }
 });
