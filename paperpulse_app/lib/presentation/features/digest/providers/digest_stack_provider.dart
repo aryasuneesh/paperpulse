@@ -89,6 +89,8 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
 
   void swipeCard() {
     if (state.currentIndex < state.papers.length) {
+      final swipedId = state.papers[state.currentIndex].id;
+      ref.read(swipedIdsProvider.notifier).record(swipedId);
       state = state.copyWith(currentIndex: state.currentIndex + 1);
     }
   }
@@ -104,5 +106,20 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
 
   void resetStack() {
     state = state.copyWith(currentIndex: 0);
+  }
+
+  /// Re-snapshot from the current personalized digest. Used after a manual
+  /// papers refresh — the notifier otherwise holds the initial snapshot for
+  /// the session (guarded by [_initialLoaded]) to keep indices stable.
+  void reload() {
+    _initialLoaded = false;
+    final fresh =
+        ref.read(personalizedDigestProvider).asData?.value ?? const <Paper>[];
+    _initialLoaded = true;
+    state = DigestStackState(
+      papers: fresh,
+      currentIndex: 0,
+      isLoading: false,
+    );
   }
 }

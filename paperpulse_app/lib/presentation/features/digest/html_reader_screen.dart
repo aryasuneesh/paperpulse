@@ -146,9 +146,42 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     }
   }
 
+  Future<void> _injectSelectionStyles() async {
+    // ArXiv HTML wraps every word in <span class="ltx_text"> which makes
+    // the native selection handle snap to span boundaries. Also: some ArXiv
+    // stylesheets set `user-select: none` on wrappers. We force text selection
+    // and normalize whitespace so long-press starts the handle near the tapped
+    // word instead of jumping to the next line break.
+    await _controller.runJavaScript(r'''
+(function() {
+  if (document.getElementById('_pp_sel_style')) return;
+  var s = document.createElement('style');
+  s.id = '_pp_sel_style';
+  s.textContent =
+    '*, *::before, *::after {' +
+      '-webkit-user-select: text !important;' +
+      'user-select: text !important;' +
+      '-webkit-touch-callout: default !important;' +
+    '}' +
+    '.ltx_text, .ltx_word, span {' +
+      'display: inline !important;' +
+    '}' +
+    'p, li, .ltx_p, .ltx_para {' +
+      'cursor: text;' +
+      'word-break: normal;' +
+      'overflow-wrap: break-word;' +
+    '}' +
+    '::selection { background: rgba(163,184,153,0.35); }';
+  document.head.appendChild(s);
+})();
+''');
+  }
+
   Future<void> _onPageLoaded() async {
     if (!mounted) return;
     await _applyFontSize();
+    if (!mounted) return;
+    await _injectSelectionStyles();
     if (!mounted) return;
 
     // Selection listener: store the live Range object so applyHighlight can use
@@ -183,20 +216,48 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
 
     if (!mounted) return;
 
-    // applyHighlight: wraps the stored Range in a coloured span.
-    // restoreHighlight: uses window.find() to locate saved text, then wraps it.
-    await _controller.runJavaScript('''
-function _ppWrapRange(range, color) {
-  var span = document.createElement('span');
-  span.setAttribute('style',
+    // Wraps each text-node slice inside a range in its own coloured span.
+    // This preserves inline markup (links, italics) and handles cross-element
+    // selections — unlike surroundContents which throws on non-text boundaries
+    // and the extractContents fallback which rebuilds the subtree.
+    //
+    // restoreHighlight walks the DOM, concatenates all visible text while
+    // tracking node offsets, searches the concatenated string for the saved
+    // text, and maps the match back to a Range. This works across <b>/<a>/etc.
+    // boundaries where window.find() gives inconsistent results.
+    await _controller.runJavaScript(r'''
+function _ppSpan(color) {
+  var s = document.createElement('span');
+  s.className = '_pp_hl';
+  s.setAttribute('style',
     'background:' + color + ' !important;' +
     'border-radius:2px;padding:0 1px;display:inline;');
-  try {
-    range.surroundContents(span);
-  } catch(e) {
-    var frag = range.extractContents();
-    span.appendChild(frag);
-    range.insertNode(span);
+  return s;
+}
+function _ppWrapRange(range, color) {
+  if (range.collapsed) return;
+  // Single text node — safe to surroundContents.
+  if (range.startContainer === range.endContainer &&
+      range.startContainer.nodeType === 3) {
+    try { range.surroundContents(_ppSpan(color)); return; } catch(e) {}
+  }
+  // Multi-node: walk text nodes inside the range and wrap each slice.
+  var start = range.startContainer, startOff = range.startOffset;
+  var end = range.endContainer, endOff = range.endOffset;
+  var walker = document.createTreeWalker(
+    range.commonAncestorContainer, NodeFilter.SHOW_TEXT, null, false);
+  var nodes = [], n;
+  while ((n = walker.nextNode())) {
+    if (range.intersectsNode(n)) nodes.push(n);
+  }
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i];
+    var a = (node === start) ? startOff : 0;
+    var b = (node === end) ? endOff : node.nodeValue.length;
+    if (b <= a) continue;
+    var sub = document.createRange();
+    try { sub.setStart(node, a); sub.setEnd(node, b); } catch(e) { continue; }
+    try { sub.surroundContents(_ppSpan(color)); } catch(e) {}
   }
 }
 function applyHighlight(color) {
@@ -204,17 +265,66 @@ function applyHighlight(color) {
   if (!range) return;
   _ppWrapRange(range, color);
   window._ppRange = null;
-  window.getSelection().removeAllRanges();
+  var sel = window.getSelection();
+  if (sel) sel.removeAllRanges();
+}
+function _ppCollectText() {
+  var walker = document.createTreeWalker(
+    document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n) {
+        var p = n.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        var tag = p.tagName;
+        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }, false);
+  var nodes = [], starts = [], full = '';
+  var n;
+  while ((n = walker.nextNode())) {
+    starts.push(full.length);
+    nodes.push(n);
+    full += n.nodeValue;
+  }
+  return { nodes: nodes, starts: starts, full: full };
+}
+function _ppNodeAt(starts, offset) {
+  // Binary search: largest starts[i] <= offset.
+  var lo = 0, hi = starts.length - 1, ans = 0;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    if (starts[mid] <= offset) { ans = mid; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return ans;
 }
 function restoreHighlight(text, color) {
-  if (!text || !window.find) return;
-  if (window.find(text, false, false, false, false, false, false)) {
-    var sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      _ppWrapRange(sel.getRangeAt(0), color);
-      sel.removeAllRanges();
+  if (!text) return;
+  var data = _ppCollectText();
+  // Try exact match first, then whitespace-normalized.
+  var idx = data.full.indexOf(text);
+  var matched = text;
+  if (idx < 0) {
+    var norm = text.replace(/\s+/g, ' ').trim();
+    if (norm !== text) {
+      idx = data.full.indexOf(norm);
+      matched = norm;
     }
   }
+  if (idx < 0) return;
+  var endIdx = idx + matched.length;
+  var si = _ppNodeAt(data.starts, idx);
+  var ei = _ppNodeAt(data.starts, endIdx - 1);
+  var startOff = idx - data.starts[si];
+  var endOff = endIdx - data.starts[ei];
+  var range = document.createRange();
+  try {
+    range.setStart(data.nodes[si], startOff);
+    range.setEnd(data.nodes[ei], endOff);
+  } catch(e) { return; }
+  _ppWrapRange(range, color);
 }
 ''');
 

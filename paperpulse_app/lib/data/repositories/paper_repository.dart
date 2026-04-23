@@ -6,6 +6,12 @@ import '../models/paper_organization.dart';
 
 final paperRepositoryProvider = Provider((ref) => PaperRepository());
 
+class DailyPapersResult {
+  final List<Paper> papers;
+  final DateTime? dailyDate;
+  const DailyPapersResult({required this.papers, this.dailyDate});
+}
+
 class PaperRepository {
   static const String _baseUrl = 'https://huggingface.co/api/daily_papers';
   static const Duration _timeout = Duration(seconds: 15);
@@ -15,6 +21,13 @@ class PaperRepository {
   PaperRepository({http.Client? client}) : _client = client ?? http.Client();
 
   Future<List<Paper>> fetchDailyPapers() async {
+    final result = await fetchDailyPapersWithMeta();
+    return result.papers;
+  }
+
+  /// Returns papers plus the HF editorial curation date from the first entry.
+  /// Callers use [DailyPapersResult.dailyDate] to detect stale payloads.
+  Future<DailyPapersResult> fetchDailyPapersWithMeta() async {
     final response = await _client.get(Uri.parse(_baseUrl)).timeout(_timeout);
 
     if (response.statusCode != 200) {
@@ -22,7 +35,27 @@ class PaperRepository {
     }
 
     final List<dynamic> data = json.decode(response.body);
-    return data.map((entry) => _parsePaper(entry)).whereType<Paper>().toList();
+    final papers =
+        data.map((entry) => _parsePaper(entry)).whereType<Paper>().toList();
+
+    DateTime? dailyDate;
+    for (final entry in data) {
+      if (entry is Map<String, dynamic>) {
+        final raw = entry['publishedAt'] as String? ??
+            (entry['paper'] is Map<String, dynamic>
+                ? (entry['paper'] as Map<String, dynamic>)['submittedOnDailyAt']
+                    as String?
+                : null);
+        if (raw != null) {
+          try {
+            dailyDate = DateTime.parse(raw);
+            break;
+          } catch (_) {}
+        }
+      }
+    }
+
+    return DailyPapersResult(papers: papers, dailyDate: dailyDate);
   }
 
   Paper? _parsePaper(dynamic entry) {

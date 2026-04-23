@@ -7,6 +7,7 @@ import '../../../data/models/paper.dart';
 import '../../common_widgets/curiosity_card.dart';
 import '../library/providers/bookmark_provider.dart';
 import 'paper_detail_modal.dart';
+import '../../../data/providers/papers_provider.dart';
 import 'providers/digest_stack_provider.dart';
 import 'providers/personalized_digest_provider.dart';
 import 'providers/streak_provider.dart';
@@ -94,7 +95,7 @@ class DigestScreen extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: _buildTopBar(theme, ref),
+              child: _buildTopBar(context, theme, ref),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -220,7 +221,7 @@ class DigestScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTopBar(ThemeData theme, WidgetRef ref) {
+  Widget _buildTopBar(BuildContext context, ThemeData theme, WidgetRef ref) {
     final streak = ref.watch(streakProvider);
     final streakLabel = streak > 0 ? '$streak-day streak' : 'Start a streak!';
 
@@ -249,29 +250,49 @@ class DigestScreen extends ConsumerWidget {
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.sageLight,
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Row(
-            children: [
-              const Text('🔥', style: TextStyle(fontSize: 12)),
-              const SizedBox(width: 4),
-              Text(
-                streakLabel,
-                style: const TextStyle(
-                  fontFamily: 'JetBrains Mono',
-                  fontSize: 11,
-                  color: AppColors.sageDark,
-                  fontWeight: FontWeight.w600,
-                ),
+        Row(
+          children: [
+            _RefreshButton(onPressed: () => _onRefresh(context, ref)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.sageLight,
+                borderRadius: BorderRadius.circular(100),
               ),
-            ],
-          ),
+              child: Row(
+                children: [
+                  const Text('🔥', style: TextStyle(fontSize: 12)),
+                  const SizedBox(width: 4),
+                  Text(
+                    streakLabel,
+                    style: const TextStyle(
+                      fontFamily: 'JetBrains Mono',
+                      fontSize: 11,
+                      color: AppColors.sageDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Future<void> _onRefresh(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(papersProvider.notifier).refresh();
+    // Re-snapshot the digest stack so the user sees the new papers immediately.
+    ref.read(digestStackProvider.notifier).reload();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Digest refreshed'),
+        backgroundColor: AppColors.sageGreen,
+        duration: Duration(seconds: 1),
+      ),
     );
   }
 
@@ -457,6 +478,34 @@ class DigestScreen extends ConsumerWidget {
               child: Text('See $extendedCount more papers →'),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact refresh affordance in the digest top bar. Forces a fresh fetch
+/// from HuggingFace — the escape hatch when the auto-freshness logic in
+/// [PapersNotifier] hasn't fired yet (e.g. HF drops today's batch mid-session).
+class _RefreshButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _RefreshButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: const Padding(
+          padding: EdgeInsets.all(6),
+          child: Icon(
+            Icons.refresh,
+            size: 20,
+            color: AppColors.sageDark,
+          ),
+        ),
       ),
     );
   }

@@ -91,8 +91,15 @@ List<Paper> selectPersonalizedPapers({
 bool hasEnoughTopicSignal(int bookmarkCount) =>
     bookmarkCount >= _topicSignalThreshold;
 
-/// Papers NOT in [excludeIds], sorted by topic-signal overlap (desc).
-/// Falls back to original order when there is no topic signal yet.
+/// Papers NOT in [excludeIds] that actually match the user's topic signal,
+/// sorted by overlap strength (desc). Size is emergent — a user with narrow
+/// interests sees fewer extended papers; one with broad interests sees more.
+///
+/// Fallbacks:
+///   - No signal yet (fresh user, no picks, no bookmarks) → return the whole
+///     remaining pool so the extended CTA still has something to offer.
+///   - Signal exists but zero papers match → return empty; the UI surfaces
+///     "All done!" instead of padding with irrelevant papers.
 List<Paper> selectExtendedPapers({
   required List<Paper> papers,
   required Map<String, int> signal,
@@ -101,13 +108,16 @@ List<Paper> selectExtendedPapers({
   final pool = papers.where((p) => !excludeIds.contains(p.id)).toList();
   if (pool.isEmpty) return const [];
   if (signal.isEmpty) return pool;
-  final scored = pool.map((p) {
-    var score = 0;
-    for (final tag in p.topicTags) {
-      score += signal[tag] ?? 0;
-    }
-    return (paper: p, score: score);
-  }).toList()
+  final scored = pool
+      .map((p) {
+        var score = 0;
+        for (final tag in p.topicTags) {
+          score += signal[tag] ?? 0;
+        }
+        return (paper: p, score: score);
+      })
+      .where((e) => e.score > 0)
+      .toList()
     ..sort((a, b) => b.score.compareTo(a.score));
   return scored.map((e) => e.paper).toList();
 }
