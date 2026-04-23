@@ -9,6 +9,9 @@
   <meta property="og:description" content="The day's notable AI papers, framed like science journalism. Local-first. No accounts.">
   <meta property="og:type" content="website">
 
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -41,8 +44,11 @@
   <!-- NAV -->
   <nav class="sticky top-0 bg-paper-white border-b border-light-gray z-50">
     <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="font-serif text-xl tracking-tight">
-        <span class="text-ink-black">Paper</span><span class="text-sage-dark italic">Pulse</span>
+      <div class="flex items-center gap-2">
+        <img src="logo.png" alt="PaperPulse logo" class="w-8 h-8 rounded-md">
+        <div class="font-serif text-xl tracking-tight">
+          <span class="text-ink-black">Paper</span><span class="text-sage-dark italic">Pulse</span>
+        </div>
       </div>
       <a href="#download"
          class="bg-sage-green text-ink-black font-sans font-semibold text-sm px-5 py-2 rounded-full hover:opacity-90 transition-opacity">
@@ -81,20 +87,21 @@
       <div class="bg-dark-gray rounded-2xl p-6 max-w-sm w-full text-left" style="box-shadow: 0 8px 32px rgba(0,0,0,0.30);">
         <div class="flex justify-between items-center mb-4">
           <span class="font-mono text-[9px] tracking-widest uppercase bg-sage-light text-sage-dark border border-sage-green rounded-full px-3 py-1">
-            Machine Learning
+            Language Models
           </span>
           <span class="font-mono text-[9px] tracking-wider text-mid-gray border border-mid-gray rounded-full px-3 py-1">
             arXiv
           </span>
         </div>
         <h3 class="font-serif text-lg text-paper-white leading-snug mb-2">
-          Language Models Learn to Reason Without Being Told How
+          Chain-of-Thought Prompting Elicits Reasoning in Large Language Models
         </h3>
-        <p class="font-mono text-[10px] text-mid-gray mb-4">Wei et al. · Google DeepMind</p>
+        <p class="font-mono text-[10px] text-mid-gray mb-4">Wei et al. · Google Research</p>
         <p class="text-paper-white/75 text-sm leading-relaxed mb-5">
-          Something unexpected emerged when researchers scaled up a language model without
-          adding any explicit reasoning instructions. The model began solving multi-step
-          problems in ways its creators hadn't programmed, and nobody fully understands why.
+          Generating a chain of thought, a series of intermediate reasoning steps, significantly
+          improves how large language models handle complex reasoning. Prompting a 540B-parameter
+          model with just eight chain-of-thought exemplars hits state-of-the-art accuracy on
+          GSM8K math problems, beating fine-tuned GPT-3 with a verifier.
         </p>
         <button class="w-full bg-sage-green text-ink-black font-semibold text-sm py-3 rounded-xl">
           Read Full Paper →
@@ -111,7 +118,7 @@
     <div class="max-w-5xl mx-auto px-6">
       <p class="font-mono text-[10px] tracking-widest uppercase text-sage-dark mb-3">Why PaperPulse</p>
       <h2 class="font-serif text-4xl mb-12">Built for people who still read the papers.</h2>
-      <div class="grid md:grid-cols-3 gap-6">
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div class="border border-light-gray rounded-2xl p-6">
           <div class="w-10 h-10 bg-sage-light rounded-full flex items-center justify-center mb-4 text-xl">✨</div>
           <h3 class="font-semibold text-base mb-2">Hooks, Not Abstracts</h3>
@@ -126,6 +133,11 @@
           <div class="w-10 h-10 bg-sage-light rounded-full flex items-center justify-center mb-4 text-xl">🔖</div>
           <h3 class="font-semibold text-base mb-2">Share the Spark</h3>
           <p class="text-mid-gray text-sm leading-relaxed">Turn any paper into a shareable Curiosity Card, the same framing you see in-app, ready to post to Twitter, WhatsApp, or group chats. Bookmark, highlight, and build a reading streak while you're at it.</p>
+        </div>
+        <div class="border border-light-gray rounded-2xl p-6">
+          <div class="w-10 h-10 bg-sage-light rounded-full flex items-center justify-center mb-4 text-xl">🏛️</div>
+          <h3 class="font-semibold text-base mb-2">Follow the Labs</h3>
+          <p class="text-mid-gray text-sm leading-relaxed">Filter the feed by the labs you care about: DeepMind, OpenAI, Anthropic, Meta FAIR, Mistral, DeepSeek, Nvidia, and more. Every paper is tagged with its origin so you can zoom into a single lab's recent output.</p>
         </div>
       </div>
     </div>
@@ -179,7 +191,10 @@
   <!-- FOOTER -->
   <footer class="bg-paper-white border-t border-light-gray py-8">
     <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <p class="font-mono text-[10px] text-mid-gray">© 2026 PaperPulse. Beta v0.1.</p>
+      <div class="flex items-center gap-2">
+        <img src="logo.png" alt="PaperPulse logo" class="w-6 h-6 rounded">
+        <p class="font-mono text-[10px] text-mid-gray">© 2026 PaperPulse. Beta v0.1.</p>
+      </div>
       <div class="flex gap-6">
         <a href="privacy-policy.html" class="font-mono text-[10px] text-mid-gray hover:text-sage-dark transition-colors">Privacy Policy</a>
         <a href="terms.html" class="font-mono text-[10px] text-mid-gray hover:text-sage-dark transition-colors">Terms of Service</a>
