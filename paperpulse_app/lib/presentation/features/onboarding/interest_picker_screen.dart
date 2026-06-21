@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../services/digest_personalization_service.dart';
 import '../../../services/topics_catalog_service.dart';
 import '../digest/providers/personalized_digest_provider.dart';
+import '../../common_widgets/web_page_shell.dart';
 
 class InterestPickerScreen extends ConsumerStatefulWidget {
   const InterestPickerScreen({super.key});
@@ -70,7 +71,8 @@ class _InterestPickerScreenState extends ConsumerState<InterestPickerScreen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: Padding(
+        child: WebPageShell(
+          child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,6 +157,7 @@ class _InterestPickerScreenState extends ConsumerState<InterestPickerScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

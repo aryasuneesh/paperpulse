@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+
+import '../../../core/utils/file_utils.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/user_provider.dart';
@@ -35,7 +36,7 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
 
   String? _selectedText;
-  File? _localPdfFile;
+  Uint8List? _localPdfBytes;
   bool _isLoadingPdf = true;
   bool _frameReady = false;
 
@@ -56,22 +57,18 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
   @override
   void dispose() {
     _pageIndicatorTimer?.cancel();
+    _pdfViewerController.dispose();
     super.dispose();
   }
 
   Future<void> _initLocalFile() async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/paper_${widget.paper.id}.pdf');
-      if (await file.exists()) {
-        if (mounted) {
-          setState(() {
-            _localPdfFile = file;
-            _isLoadingPdf = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoadingPdf = false);
+      final bytes = await readAppFile('paper_${widget.paper.id}.pdf');
+      if (mounted) {
+        setState(() {
+          _localPdfBytes = bytes;
+          _isLoadingPdf = false;
+        });
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingPdf = false);
@@ -141,9 +138,9 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
           child: RepaintBoundary(child: viewer),
         );
 
-    if (_localPdfFile != null) {
-      return common(SfPdfViewer.file(
-        _localPdfFile!,
+    if (_localPdfBytes != null) {
+      return common(SfPdfViewer.memory(
+        _localPdfBytes!,
         key: _pdfViewerKey,
         controller: _pdfViewerController,
         canShowScrollHead: false,
@@ -269,9 +266,7 @@ class _PdfReaderScreenState extends ConsumerState<PdfReaderScreen> {
     // Persist embedded PDF annotations to the local file system
     try {
       final List<int> bytes = await _pdfViewerController.saveDocument();
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/paper_${widget.paper.id}.pdf');
-      await file.writeAsBytes(bytes, flush: true);
+      await writeAppFile('paper_${widget.paper.id}.pdf', bytes);
     } catch (e) {
       debugPrint('Error saving PDF annotations: $e');
       if (mounted) {

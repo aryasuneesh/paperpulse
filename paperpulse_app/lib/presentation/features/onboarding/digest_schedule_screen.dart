@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../common_widgets/web_page_shell.dart';
 import '../../../data/models/user.dart';
 import '../../../services/daily_paper_notification_service.dart';
 import '../../../services/digest_notification_service.dart';
@@ -49,7 +50,8 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       body: SafeArea(
-        child: Padding(
+        child: WebPageShell(
+          child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -170,6 +172,7 @@ class _DigestScheduleScreenState extends State<DigestScheduleScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

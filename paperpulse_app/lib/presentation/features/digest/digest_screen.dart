@@ -13,6 +13,7 @@ import 'providers/personalized_digest_provider.dart';
 import 'providers/streak_provider.dart';
 import 'share_card_sheet.dart';
 import 'widgets/streak_popup.dart';
+import '../../common_widgets/web_page_shell.dart';
 
 const _digestTutorialSeenKey = 'paperpulse_digest_tutorial_seen';
 
@@ -91,28 +92,30 @@ class DigestScreen extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: _buildTopBar(context, theme, ref),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _buildDigestHeader(theme, papers.length),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _buildMainContent(
-                context,
-                theme,
-                ref,
-                digestState,
-                papers,
-                currentIndex,
+        child: WebPageShell(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: _buildTopBar(context, theme, ref),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildDigestHeader(theme, papers.length),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _buildMainContent(
+                  context,
+                  theme,
+                  ref,
+                  digestState,
+                  papers,
+                  currentIndex,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

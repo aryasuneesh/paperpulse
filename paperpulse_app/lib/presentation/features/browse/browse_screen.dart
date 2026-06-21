@@ -7,6 +7,7 @@ import '../../../data/providers/lab_catalog_provider.dart';
 import '../../../data/providers/lab_prefs_provider.dart';
 import '../../../data/providers/papers_provider.dart';
 import '../../common_widgets/compact_paper_card.dart';
+import '../../common_widgets/web_page_shell.dart';
 import '../digest/paper_detail_modal.dart';
 
 const _browseTopics = [
@@ -88,9 +89,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        child: WebPageShell(
+          maxWidth: 720,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
               child: Text('Browse', style: theme.textTheme.headlineLarge),
@@ -184,6 +187,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               child: _buildFeed(theme, papersAsync, labsAsync),
             ),
           ],
+          ),
         ),
       ),
     );

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/bookmark.dart';
 import '../../../data/models/paper.dart';
 import '../../common_widgets/compact_paper_card.dart';
+import '../../common_widgets/web_page_shell.dart';
 import '../digest/paper_detail_modal.dart';
 import 'highlights_section.dart';
 import 'providers/bookmark_provider.dart';
@@ -38,9 +39,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        child: WebPageShell(
+          maxWidth: 720,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
               child: Text('Library', style: theme.textTheme.headlineLarge),
@@ -91,6 +94,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               ),
             ),
           ],
+          ),
         ),
       ),
     );

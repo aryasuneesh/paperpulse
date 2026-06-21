@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../common_widgets/web_page_shell.dart';
 import '../../../data/models/paper.dart';
 import '../../../data/providers/papers_provider.dart';
 import '../library/providers/bookmark_provider.dart';
@@ -47,7 +48,8 @@ class _SampleCardsScreenState extends ConsumerState<SampleCardsScreen> {
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       body: SafeArea(
-        child: Padding(
+        child: WebPageShell(
+          child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,6 +100,7 @@ class _SampleCardsScreenState extends ConsumerState<SampleCardsScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
