@@ -1,4 +1,4 @@
-package com.example.paperpulse_app
+package com.paperpulse
 
 import io.flutter.embedding.android.FlutterActivity
 
