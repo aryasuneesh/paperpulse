@@ -78,7 +78,7 @@ class HighlightsSection extends ConsumerWidget {
                     MaterialPageRoute(
                       builder: (_) => HtmlReaderScreen(
                         paper: paper,
-                        initialSearchText: h.searchText ?? h.textContent,
+                        initialSearchText: h.textContent,
                       ),
                     ),
                   );

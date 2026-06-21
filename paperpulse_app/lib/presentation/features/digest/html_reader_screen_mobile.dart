@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -32,6 +33,9 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
   SharedPreferences? _prefs;
   String? _pendingSelection;
   String? _pendingSentence;
+  Rect? _pillRect;
+  String? _pillText;
+  String? _pillSentence;
 
   static const _fontSizeKey = 'paperpulse_html_font_size';
   static const _minFontSize = 12;
@@ -44,6 +48,13 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     '#F4A261',
     '#E76F51',
     '#457B9D',
+  ];
+
+  static const _kAnnotationTypes = <(String, IconData, String)>[
+    ('highlight', Icons.highlight, 'Highlight'),
+    ('underline', Icons.format_underline, 'Underline'),
+    ('strikethrough', Icons.strikethrough_s, 'Strike'),
+    ('squiggly', Icons.waves, 'Squiggly'),
   ];
 
   String get _htmlUrl {
@@ -66,28 +77,39 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
         onPageFinished: (_) => _onPageLoaded(),
       ))
       ..addJavaScriptChannel(
+        'ClipboardHandler',
+        onMessageReceived: (msg) async {
+          await Clipboard.setData(ClipboardData(text: msg.message));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Copied!'),
+                backgroundColor: AppColors.sageGreen,
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 1),
+              ),
+            );
+          }
+        },
+      )
+      ..addJavaScriptChannel(
         'SelectionHandler',
         onMessageReceived: (msg) {
           try {
             final data = jsonDecode(msg.message) as Map<String, dynamic>;
-            final action = data['action'] as String? ?? 'selection';
-            if (action == 'show_picker') {
+            final action = data['action'] as String? ?? '';
+            if (action == 'show_pill') {
               final text = data['text'] as String? ?? '';
               final sentence = data['sentence'] as String? ?? text;
-              if (text.trim().isNotEmpty && mounted) {
-                _pendingSelection = text;
-                _pendingSentence = sentence;
-                _showColorPicker(context);
-              }
-            } else {
-              // plain selection update — just track state for the clear button
-              final text = data['text'] as String? ?? '';
-              if (mounted) {
+              if (text.isNotEmpty && mounted) {
                 setState(() {
-                  _pendingSelection = text.trim().isEmpty ? null : text;
-                  _pendingSentence = text.trim().isEmpty ? null : (data['sentence'] as String? ?? text);
+                  _pillText = text;
+                  _pillSentence = sentence;
+                  _pillRect = Rect.zero; // non-null sentinel; position is fixed bottom-centre
                 });
               }
+            } else if (action == 'hide_pill') {
+              if (mounted && _pillRect != null) setState(() { _pillRect = null; });
             }
           } catch (_) {}
         },
@@ -99,6 +121,70 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
   void dispose() {
     _prefs?.setInt(_fontSizeKey, _fontSize);
     super.dispose();
+  }
+
+  void _onCopyTap() async {
+    if (_pillText == null) return;
+    final text = _pillText!;
+    if (mounted) setState(() { _pillRect = null; _pillText = null; _pillSentence = null; });
+    await _controller.runJavaScript("window.getSelection()?.removeAllRanges?.()");
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Copied!'),
+        backgroundColor: AppColors.sageGreen,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 1),
+      ));
+    }
+  }
+
+  void _onHighlightTap() {
+    if (_pillText == null) return;
+    _pendingSelection = _pillText;
+    _pendingSentence = _pillSentence;
+    if (mounted) setState(() { _pillRect = null; });
+    _showAnnotationPicker(context);
+  }
+
+  Widget _buildPillOverlay() {
+    return Positioned(
+      bottom: 32,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0x1F000000)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 2)),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _pillButton('Copy', const Color(0xFF222222), rightBorder: true, onTap: _onCopyTap),
+              _pillButton('✦ Highlight', const Color(0xFF3a5a40), rightBorder: false, onTap: _onHighlightTap),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pillButton(String label, Color color, {required bool rightBorder, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: rightBorder
+            ? const BoxDecoration(border: Border(right: BorderSide(color: Color(0x1A000000))))
+            : null,
+        child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
+      ),
+    );
   }
 
   Future<void> _loadPrefs() async {
@@ -143,31 +229,14 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
   }
 
   Future<void> _injectSelectionStyles() async {
-    // ArXiv HTML wraps every word in <span class="ltx_text"> which makes
-    // the native selection handle snap to span boundaries. Also: some ArXiv
-    // stylesheets set `user-select: none` on wrappers. We force text selection
-    // and normalize whitespace so long-press starts the handle near the tapped
-    // word instead of jumping to the next line break.
     await _controller.runJavaScript(r'''
 (function() {
   if (document.getElementById('_pp_sel_style')) return;
   var s = document.createElement('style');
   s.id = '_pp_sel_style';
   s.textContent =
-    '*, *::before, *::after {' +
-      '-webkit-user-select: text !important;' +
-      'user-select: text !important;' +
-      '-webkit-touch-callout: default !important;' +
-    '}' +
-    '.ltx_text, .ltx_word, span {' +
-      'display: inline !important;' +
-    '}' +
-    'p, li, .ltx_p, .ltx_para {' +
-      'cursor: text;' +
-      'word-break: normal;' +
-      'overflow-wrap: break-word;' +
-    '}' +
-    '::selection { background: rgba(163,184,153,0.35); }';
+    'body,body *{-webkit-user-select:text;user-select:text;}' +
+    '::selection{background:rgba(163,184,153,0.35);}';
   document.head.appendChild(s);
 })();
 ''');
@@ -180,77 +249,37 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     await _injectSelectionStyles();
     if (!mounted) return;
 
-    // Inject a floating highlight button that appears above the selection.
-    // Keeping the tap inside the WebView means focus never leaves and the
-    // selection (and _ppRange) are still alive when applyHighlight is called.
+    // No DOM elements injected — pill is a Flutter overlay so it's invisible
+    // to WebView's selection hit-testing and cannot interfere with handles.
     await _controller.runJavaScript(r'''
 (function() {
-  // --- floating button ---
-  var btn = document.createElement('button');
-  btn.id = '_pp_hl_btn';
-  btn.textContent = '✦ Highlight';
-  btn.setAttribute('style',
-    'position:fixed;z-index:99999;display:none;' +
-    'background:#3a5a40;color:#fff;border:none;border-radius:20px;' +
-    'padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;' +
-    'box-shadow:0 2px 8px rgba(0,0,0,0.25);letter-spacing:0.3px;' +
-    '-webkit-user-select:none;user-select:none;');
-  document.body.appendChild(btn);
-
-  function _showBtn(rect) {
-    var top = rect.top - 44 + window.scrollY;
-    if (top < 8) top = rect.bottom + 8 + window.scrollY;
-    var left = rect.left + (rect.width / 2) - 52;
-    if (left < 8) left = 8;
-    if (left + 104 > window.innerWidth - 8) left = window.innerWidth - 112;
-    btn.style.top = top + 'px';
-    btn.style.left = left + 'px';
-    btn.style.display = 'block';
-  }
-
-  function _hideBtn() { btn.style.display = 'none'; }
-
-  btn.addEventListener('touchend', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    var sel = window.getSelection();
-    var text = sel ? sel.toString().trim() : '';
-    if (!text) { _hideBtn(); return; }
-    var sentence = text;
-    try {
-      var node = sel.getRangeAt(0).startContainer;
-      sentence = (node.textContent || text).trim().substring(0, 500);
-    } catch(ex) {}
-    _hideBtn();
-    window.SelectionHandler.postMessage(
-      JSON.stringify({action:'show_picker', text:text, sentence:sentence}));
-  });
-
+  if (window._ppSelSetup) return;
+  window._ppSelSetup = true;
+  window._ppPillShown = false;
   var _selTimer;
   document.addEventListener('selectionchange', function() {
     clearTimeout(_selTimer);
     _selTimer = setTimeout(function() {
       var sel = window.getSelection();
       var text = sel ? sel.toString().trim() : '';
-      if (text.length === 0) {
-        window._ppRange = null;
-        _hideBtn();
-        window.SelectionHandler.postMessage(JSON.stringify({action:'selection',text:'',sentence:''}));
-      } else {
-        try {
-          var range = sel.getRangeAt(0);
-          window._ppRange = range.cloneRange();
-          _showBtn(range.getBoundingClientRect());
-        } catch(e) { window._ppRange = null; _hideBtn(); }
-        var sentence = text;
-        try {
-          var node = sel.getRangeAt(0).startContainer;
-          sentence = (node.textContent || text).trim().substring(0, 500);
-        } catch(e) {}
-        window.SelectionHandler.postMessage(
-          JSON.stringify({action:'selection', text:text, sentence:sentence}));
+      if (!text) {
+        if (window._ppPillShown) {
+          window._ppPillShown = false;
+          window.SelectionHandler.postMessage(JSON.stringify({action:'hide_pill'}));
+        }
+        return;
       }
-    }, 250);
+      try {
+        var range = sel.getRangeAt(0);
+        window._ppRange = range.cloneRange();
+        var sentence = text;
+        try { sentence = (range.startContainer.textContent || text).trim().substring(0,500); } catch(_) {}
+        window._ppPillShown = true;
+        window.SelectionHandler.postMessage(JSON.stringify({
+          action:'show_pill', text:text, sentence:sentence
+        }));
+      } catch(_) { window._ppRange = null; }
+    }, 150);
   });
 })();
 ''');
@@ -267,20 +296,28 @@ class _HtmlReaderScreenState extends ConsumerState<HtmlReaderScreen> {
     // text, and maps the match back to a Range. This works across <b>/<a>/etc.
     // boundaries where window.find() gives inconsistent results.
     await _controller.runJavaScript(r'''
-function _ppSpan(color) {
+function _ppSpan(color, type) {
   var s = document.createElement('span');
   s.className = '_pp_hl';
-  s.setAttribute('style',
-    'background:' + color + ' !important;' +
-    'border-radius:2px;padding:0 1px;display:inline;');
+  var style = 'border-radius:2px;padding:0 1px;display:inline;';
+  if (type === 'underline') {
+    style += 'text-decoration-line:underline !important;text-decoration-color:' + color + ' !important;text-decoration-thickness:2px !important;';
+  } else if (type === 'strikethrough') {
+    style += 'text-decoration-line:line-through !important;text-decoration-color:' + color + ' !important;text-decoration-thickness:2px !important;';
+  } else if (type === 'squiggly') {
+    style += 'text-decoration-line:underline !important;text-decoration-style:wavy !important;text-decoration-color:' + color + ' !important;';
+  } else {
+    style += 'background:' + color + ' !important;';
+  }
+  s.setAttribute('style', style);
   return s;
 }
-function _ppWrapRange(range, color) {
+function _ppWrapRange(range, color, type) {
   if (range.collapsed) return;
   // Single text node — safe to surroundContents.
   if (range.startContainer === range.endContainer &&
       range.startContainer.nodeType === 3) {
-    try { range.surroundContents(_ppSpan(color)); return; } catch(e) {}
+    try { range.surroundContents(_ppSpan(color, type)); return; } catch(e) {}
   }
   // Multi-node: walk text nodes inside the range and wrap each slice.
   var start = range.startContainer, startOff = range.startOffset;
@@ -298,13 +335,13 @@ function _ppWrapRange(range, color) {
     if (b <= a) continue;
     var sub = document.createRange();
     try { sub.setStart(node, a); sub.setEnd(node, b); } catch(e) { continue; }
-    try { sub.surroundContents(_ppSpan(color)); } catch(e) {}
+    try { sub.surroundContents(_ppSpan(color, type)); } catch(e) {}
   }
 }
-function applyHighlight(color) {
+function applyAnnotation(color, type) {
   var range = window._ppRange;
   if (!range) return;
-  _ppWrapRange(range, color);
+  _ppWrapRange(range, color, type || 'highlight');
   window._ppRange = null;
   var sel = window.getSelection();
   if (sel) sel.removeAllRanges();
@@ -341,14 +378,16 @@ function _ppNodeAt(starts, offset) {
   }
   return ans;
 }
-function restoreHighlight(text, color) {
+function restoreHighlight(text, color, type) {
   if (!text) return;
   var data = _ppCollectText();
   // Try exact match first, then whitespace-normalized.
   var idx = data.full.indexOf(text);
   var matched = text;
   if (idx < 0) {
-    var norm = text.replace(/\s+/g, ' ').trim();
+    // Also strip soft hyphens (U+00AD) which ArXiv injects for line-breaking
+    // but which sel.toString() omits from the selected text.
+    var norm = text.replace(/[\s­]+/g, ' ').trim();
     if (norm !== text) {
       idx = data.full.indexOf(norm);
       matched = norm;
@@ -365,7 +404,7 @@ function restoreHighlight(text, color) {
     range.setStart(data.nodes[si], startOff);
     range.setEnd(data.nodes[ei], endOff);
   } catch(e) { return; }
-  _ppWrapRange(range, color);
+  _ppWrapRange(range, color, type || 'highlight');
 }
 ''');
 
@@ -375,10 +414,11 @@ function restoreHighlight(text, color) {
           (h) => h.paperId == widget.paper.id && h.readerType == 'html',
         );
     for (final h in highlights) {
-      final color = _hexToRgba(h.color, 0.6);
+      final alpha = h.annotationType == 'highlight' ? 0.6 : 0.9;
+      final color = _hexToRgba(h.color, alpha);
       if (color == null) continue;
       await _controller.runJavaScript(
-        "restoreHighlight(${jsonEncode(h.textContent)}, ${jsonEncode(color)});",
+        "restoreHighlight(${jsonEncode(h.textContent)}, ${jsonEncode(color)}, ${jsonEncode(h.annotationType)});",
       );
       if (!mounted) return;
     }
@@ -386,16 +426,21 @@ function restoreHighlight(text, color) {
     if (!mounted) return;
 
     if (widget.initialSearchText != null) {
+      // Use the same cross-node concatenated search as restoreHighlight so
+      // sentences spanning multiple ltx_text spans are found correctly.
       await _controller.runJavaScript('''
 (function() {
-  const target = ${jsonEncode(widget.initialSearchText)};
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while (node = walker.nextNode()) {
-    if (node.nodeValue.indexOf(target) >= 0) {
-      node.parentElement && node.parentElement.scrollIntoView({behavior: 'smooth', block: 'center'});
-      break;
-    }
+  var target = ${jsonEncode(widget.initialSearchText)};
+  var data = _ppCollectText();
+  var idx = data.full.indexOf(target);
+  if (idx < 0) {
+    var norm = target.replace(/[\\s\\u00AD]+/g, ' ').trim();
+    if (norm !== target) idx = data.full.indexOf(norm);
+  }
+  if (idx < 0) return;
+  var node = data.nodes[_ppNodeAt(data.starts, idx)];
+  if (node && node.parentElement) {
+    node.parentElement.scrollIntoView({behavior: 'smooth', block: 'center'});
   }
 })();
 ''');
@@ -416,8 +461,9 @@ function restoreHighlight(text, color) {
     }
   }
 
-  void _showColorPicker(BuildContext context) {
+  void _showAnnotationPicker(BuildContext context) {
     if (_pendingSelection == null) return;
+    String selectedType = 'highlight';
 
     showModalBottomSheet<void>(
       context: context,
@@ -425,29 +471,85 @@ function restoreHighlight(text, color) {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Highlight colour',
+                'Annotation',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.inkBlack,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  for (final (type, icon, label) in _kAnnotationTypes)
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setSheet(() => selectedType = type),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selectedType == type
+                                ? AppColors.sageGreen.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: selectedType == type
+                                  ? AppColors.sageGreen
+                                  : AppColors.lightGray,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                icon,
+                                size: 18,
+                                color: selectedType == type
+                                    ? AppColors.sageDark
+                                    : AppColors.midGray,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: selectedType == type
+                                      ? AppColors.sageDark
+                                      : AppColors.midGray,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Colour',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkBlack,
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: _highlightColors.map((hexColor) {
                   return GestureDetector(
                     onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      await _saveHighlight(hexColor);
+                      Navigator.of(sheetCtx).pop();
+                      await _saveHighlight(hexColor, selectedType);
                     },
                     child: Container(
                       width: 40,
@@ -464,11 +566,10 @@ function restoreHighlight(text, color) {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 8),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -477,7 +578,7 @@ function restoreHighlight(text, color) {
     return Color(int.parse('FF$h', radix: 16));
   }
 
-  Future<void> _saveHighlight(String selectedHexColor) async {
+  Future<void> _saveHighlight(String selectedHexColor, String type) async {
     if (_pendingSelection == null) return;
     if (!mounted) return;
 
@@ -493,14 +594,16 @@ function restoreHighlight(text, color) {
       annotationName: '',
       readerType: 'html',
       searchText: sentence,
+      annotationType: type,
       createdAt: DateTime.now(),
     );
     ref.read(highlightProvider.notifier).addHighlight(h);
 
-    final rgba = _hexToRgba(selectedHexColor, 0.6);
+    final alpha = type == 'highlight' ? 0.6 : 0.9;
+    final rgba = _hexToRgba(selectedHexColor, alpha);
     if (rgba != null) {
       await _controller.runJavaScript(
-        "applyHighlight(${jsonEncode(rgba)});",
+        "applyAnnotation(${jsonEncode(rgba)}, ${jsonEncode(type)});",
       );
     }
 
@@ -554,7 +657,12 @@ function restoreHighlight(text, color) {
           ),
         ],
       ),
-      body: WebViewWidget(controller: _controller),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_pillRect != null) _buildPillOverlay(),
+        ],
+      ),
     );
   }
 }

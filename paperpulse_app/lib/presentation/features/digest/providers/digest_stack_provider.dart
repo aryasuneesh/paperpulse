@@ -73,7 +73,7 @@ class DigestStackNotifier extends Notifier<DigestStackState> {
           },
         );
       },
-      fireImmediately: true,
+      fireImmediately: false,
     );
 
     final initial = ref.read(personalizedDigestProvider);
